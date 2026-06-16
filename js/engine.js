@@ -116,3 +116,13 @@ export function proyectar(inputs, ajuste = 0) {
     ahorroAcumuladoB,
   };
 }
+
+// Devuelve las 3 proyecciones aplicando ∓ajusteEscenario al retorno.
+export function escenarios(inputs) {
+  const d = inputs.ajusteEscenario;
+  return {
+    pesimista: proyectar(inputs, -d),
+    realista: proyectar(inputs, 0),
+    optimista: proyectar(inputs, +d),
+  };
+}

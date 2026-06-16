@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar } from '../js/engine.js';
+import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios } from '../js/engine.js';
 
 test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
   const m = tasaMensual(0.06);
@@ -87,4 +87,22 @@ test('proyectar: crecimiento de sueldo sube el aporte AFP del año 2', () => {
   const r = proyectar({ ...baseInputs, crecimientoSueldo: 0.10 });
   // año1 aporte 122.000, año2 aporte 134.200 => total = (122000+134200)*12
   assert.equal(Math.round(r.total), Math.round((122000 + 134200) * 12));
+});
+
+test('escenarios: realista usa el retorno base', () => {
+  const r = escenarios({ ...baseInputs, retornoAFP: 0.04, ajusteEscenario: 0.02 });
+  const directo = proyectar({ ...baseInputs, retornoAFP: 0.04 });
+  assert.equal(Math.round(r.realista.total), Math.round(directo.total));
+});
+
+test('escenarios: optimista > realista > pesimista cuando hay aportes y retorno', () => {
+  const r = escenarios({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05, ajusteEscenario: 0.02 });
+  assert.ok(r.optimista.total > r.realista.total);
+  assert.ok(r.realista.total > r.pesimista.total);
+});
+
+test('escenarios: el ajuste aplicado es ±ajusteEscenario', () => {
+  const r = escenarios({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05, ajusteEscenario: 0.02 });
+  const opt = proyectar({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05 }, 0.02);
+  assert.equal(Math.round(r.optimista.total), Math.round(opt.total));
 });
