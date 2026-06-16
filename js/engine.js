@@ -23,7 +23,8 @@ export function imponibleDesdeLiquido(sueldoLiquido, factorImponible) {
 
 // Aporte obligatorio mensual a la AFP. Si hay override manual, se usa tal cual.
 export function aporteAFPMensual({ sueldoLiquido, factorImponible, aporteAFPManual }) {
-  if (aporteAFPManual != null) return aporteAFPManual;
+  // Trata null y string vacío (campo borrado en la UI) como "auto" para no propagar NaN.
+  if (aporteAFPManual != null && aporteAFPManual !== '') return aporteAFPManual;
   return imponibleDesdeLiquido(sueldoLiquido, factorImponible) * COTIZACION_OBLIGATORIA;
 }
 

@@ -32,11 +32,20 @@ export function simulador() {
       // Guarda: si los inputs no son válidos, no recalcula (mantiene último estado válido)
       if (this.inputs.edadRetiro <= this.inputs.edadActual) return;
       if (this.inputs.sueldoLiquido < 0 || this.inputs.utm <= 0 || this.inputs.uf <= 0) return;
+      if (this.inputs.factorImponible <= 0) return;
       const e = escenarios(this.inputs);
       const conv = (esc) => {
         if (!this.vistaReal) return esc;
         const serie = aReal(esc.serie, this.inputs.inflacion, this.inputs.edadActual);
-        return { ...esc, serie, total: serie.at(-1).total };
+        // Deflactor al horizonte de retiro para llevar los beneficios acumulados a pesos de hoy.
+        const factor = Math.pow(1 + this.inputs.inflacion, this.inputs.edadRetiro - this.inputs.edadActual);
+        return {
+          ...esc,
+          serie,
+          total: serie.at(-1).total,
+          bonoAcumuladoA: esc.bonoAcumuladoA / factor,
+          ahorroAcumuladoB: esc.ahorroAcumuladoB / factor,
+        };
       };
       this.resultado = {
         pesimista: conv(e.pesimista), realista: conv(e.realista), optimista: conv(e.optimista),

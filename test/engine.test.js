@@ -29,6 +29,11 @@ test('aporteAFPMensual: respeta el override manual', () => {
   assert.equal(aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: 90000 }), 90000);
 });
 
+test('aporteAFPMensual: string vacío (campo borrado) se trata como auto, no NaN', () => {
+  const r = aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: '' });
+  assert.equal(r, 122000);
+});
+
 test('bonificacionA: 15% del aporte anual bajo el tope', () => {
   // aporte anual 600.000 => 15% = 90.000; tope 6 UTM*67.000 = 402.000 => no aplica tope
   assert.equal(bonificacionA(600000, 67000), 90000);

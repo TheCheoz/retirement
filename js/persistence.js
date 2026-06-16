@@ -6,16 +6,24 @@ const KEY_SCENARIOS = 'retiro:escenarios';
 // Codifica inputs a base64 (compatible navegador y Node).
 export function encodeState(inputs) {
   const json = JSON.stringify(inputs);
-  if (typeof btoa === 'function') return btoa(unescape(encodeURIComponent(json)));
+  if (typeof btoa === 'function') {
+    // Idioma moderno unicode-safe (sin escape/unescape deprecados).
+    const bytes = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    return btoa(bytes);
+  }
   return Buffer.from(json, 'utf-8').toString('base64');
 }
 
 export function decodeState(encoded) {
   if (!encoded) return null;
   try {
-    const json = typeof atob === 'function'
-      ? decodeURIComponent(escape(atob(encoded)))
-      : Buffer.from(encoded, 'base64').toString('utf-8');
+    let json;
+    if (typeof atob === 'function') {
+      const bytes = atob(encoded);
+      json = decodeURIComponent(Array.from(bytes, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+    } else {
+      json = Buffer.from(encoded, 'base64').toString('utf-8');
+    }
     return JSON.parse(json);
   } catch {
     return null;

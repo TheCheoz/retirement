@@ -52,14 +52,14 @@
           <label class="field">Sueldo líquido<input type="number" x-model.number="inputs.sueldoLiquido"></label>
           <label class="field">Factor imponible<input type="number" step="0.01" x-model.number="inputs.factorImponible"></label>
           <label class="field">Aporte AFP (manual)<input type="number" placeholder="auto" x-model.number="inputs.aporteAFPManual"></label>
-          <label class="field">Crec. sueldo %<input type="number" step="0.01" :value="inputs.crecimientoSueldo*100" @input="inputs.crecimientoSueldo=$event.target.value/100"></label>
+          <label class="field">Crec. sueldo %<input type="number" step="0.01" :value="inputs.crecimientoSueldo*100" @input="$event.target.value!==''&&(inputs.crecimientoSueldo=$event.target.value/100)"></label>
         </div>
       </details>
 
       <details class="kpi"><summary class="cursor-pointer font-semibold">AFP</summary>
         <div class="grid grid-cols-2 gap-2 mt-2">
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAFP"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAFP*100" @input="inputs.retornoAFP=$event.target.value/100"></label>
+          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAFP*100" @input="$event.target.value!==''&&(inputs.retornoAFP=$event.target.value/100)"></label>
         </div>
       </details>
 
@@ -71,7 +71,7 @@
           <label class="field">Aporte A /mes<input type="number" x-model.number="inputs.aporteAPV_A"></label>
           <label class="field">Aporte B /mes<input type="number" x-model.number="inputs.aporteAPV_B"></label>
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAPV"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAPV*100" @input="inputs.retornoAPV=$event.target.value/100"></label>
+          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAPV*100" @input="$event.target.value!==''&&(inputs.retornoAPV=$event.target.value/100)"></label>
           <label class="field flex-row items-center gap-2"><input type="checkbox" x-model="inputs.apvFijo"> APV fijo</label>
           <label class="field flex-row items-center gap-2"><input type="checkbox" x-model="inputs.reinvertirB"> Reinvertir ahorro B</label>
         </div>
@@ -81,7 +81,7 @@
         <div class="grid grid-cols-2 gap-2 mt-2">
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoETF"></label>
           <label class="field">Aporte /mes<input type="number" x-model.number="inputs.aporteETF"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoETF*100" @input="inputs.retornoETF=$event.target.value/100"></label>
+          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoETF*100" @input="$event.target.value!==''&&(inputs.retornoETF=$event.target.value/100)"></label>
         </div>
       </details>
 
@@ -89,8 +89,8 @@
         <div class="grid grid-cols-2 gap-2 mt-2">
           <label class="field">UTM<input type="number" x-model.number="inputs.utm"></label>
           <label class="field">UF<input type="number" x-model.number="inputs.uf"></label>
-          <label class="field">Inflación %<input type="number" step="0.01" :value="inputs.inflacion*100" @input="inputs.inflacion=$event.target.value/100"></label>
-          <label class="field">Ajuste escenario ±%<input type="number" step="0.01" :value="inputs.ajusteEscenario*100" @input="inputs.ajusteEscenario=$event.target.value/100"></label>
+          <label class="field">Inflación %<input type="number" step="0.01" :value="inputs.inflacion*100" @input="$event.target.value!==''&&(inputs.inflacion=$event.target.value/100)"></label>
+          <label class="field">Ajuste escenario ±%<input type="number" step="0.01" :value="inputs.ajusteEscenario*100" @input="$event.target.value!==''&&(inputs.ajusteEscenario=$event.target.value/100)"></label>
         </div>
       </details>
 
@@ -107,7 +107,7 @@
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="vistaReal"> Ver en pesos de hoy (real)</label>
       </div>
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" x-show="resultado">
+      <template x-if="resultado"><div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="kpi"><div class="text-xs text-gray-400">Saldo final (realista)</div>
           <div class="text-xl font-bold text-blue-400" x-text="fmt(resultado.realista.total)"></div>
           <div class="text-xs text-gray-500"><span x-text="fmt(resultado.pesimista.total)"></span> – <span x-text="fmt(resultado.optimista.total)"></span></div>
@@ -118,7 +118,7 @@
           <div class="text-lg font-bold" x-text="fmt(resultado.realista.bonoAcumuladoA)"></div></div>
         <div class="kpi"><div class="text-xs text-gray-400">Ahorro tributario B acum.</div>
           <div class="text-lg font-bold" x-text="fmt(resultado.realista.ahorroAcumuladoB)"></div></div>
-      </div>
+      </div></template>
 
       <div class="kpi" style="height:380px"><canvas id="grafico"></canvas></div>
 
