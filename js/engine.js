@@ -1,4 +1,4 @@
-import { COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM } from './constants.js';
+import { COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM, TRAMOS_IMPUESTO, APV_TOPE_UF_ANUAL } from './constants.js';
 
 // Tasa mensual equivalente a una tasa anual compuesta.
 export function tasaMensual(tasaAnual) {
@@ -30,4 +30,20 @@ export function aporteAFPMensual({ sueldoLiquido, factorImponible, aporteAFPManu
 // Bonificación estatal anual del Régimen A: 15% del aporte, tope 6 UTM/año.
 export function bonificacionA(aporteAnualA, utm) {
   return Math.min(BONIFICACION_A_PCT * aporteAnualA, BONIFICACION_A_TOPE_UTM * utm);
+}
+
+// Tasa marginal del Impuesto Único de 2ª Categoría según el imponible mensual.
+export function tasaMarginal(imponibleMensual, utm) {
+  const enUTM = imponibleMensual / utm;
+  for (const t of TRAMOS_IMPUESTO) {
+    if (enUTM > t.desde && enUTM <= t.hasta) return t.factor;
+  }
+  return 0;
+}
+
+// Ahorro tributario anual del Régimen B: aporte (topado a 600 UF) * tasa marginal.
+export function ahorroTributarioB(aporteAnualB, imponibleMensual, utm, uf) {
+  const topeAnual = APV_TOPE_UF_ANUAL * uf;
+  const base = Math.min(aporteAnualB, topeAnual);
+  return base * tasaMarginal(imponibleMensual, utm);
 }
