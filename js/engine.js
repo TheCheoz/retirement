@@ -126,3 +126,18 @@ export function escenarios(inputs) {
     optimista: proyectar(inputs, +d),
   };
 }
+
+// Pensión mensual estimada (retiro programado simplificado): saldo / meses esperados.
+export function pensionEstimada(saldoFinal, edadRetiro, expectativaVida) {
+  const meses = (expectativaVida - edadRetiro) * 12;
+  if (meses <= 0) return 0;
+  return saldoFinal / meses;
+}
+
+// Convierte una serie nominal a pesos de hoy descontando inflación.
+export function aReal(serie, inflacion, edadActual) {
+  return serie.map((p) => ({
+    ...p,
+    total: p.total / Math.pow(1 + inflacion, p.edad - edadActual),
+  }));
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios } from '../js/engine.js';
+import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios, pensionEstimada, aReal } from '../js/engine.js';
 
 test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
   const m = tasaMensual(0.06);
@@ -105,4 +105,23 @@ test('escenarios: el ajuste aplicado es ±ajusteEscenario', () => {
   const r = escenarios({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05, ajusteEscenario: 0.02 });
   const opt = proyectar({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05 }, 0.02);
   assert.equal(Math.round(r.optimista.total), Math.round(opt.total));
+});
+
+test('pensionEstimada: saldo dividido por meses esperados', () => {
+  // saldo 120.000.000; (85-65)*12 = 240 meses => 500.000
+  assert.equal(pensionEstimada(120000000, 65, 85), 500000);
+});
+
+test('pensionEstimada: 0 meses esperados => 0 (sin división por cero)', () => {
+  assert.equal(pensionEstimada(120000000, 85, 85), 0);
+});
+
+test('aReal: descuenta inflación según años desde hoy', () => {
+  const serie = [
+    { edad: 30, total: 1000000 },
+    { edad: 31, total: 1000000 },
+  ];
+  const r = aReal(serie, 0.10, 30);
+  assert.equal(Math.round(r[0].total), 1000000);          // año 0
+  assert.equal(Math.round(r[1].total), Math.round(1000000 / 1.1)); // año 1
 });
