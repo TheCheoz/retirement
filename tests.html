@@ -12,9 +12,13 @@
 <body>
   <h1>Tests del motor (navegador)</h1>
   <pre id="out"></pre>
-  <script type="module">
-    import { bonificacionA, escenarios, pensionEstimada } from './js/engine.js';
-    import { encodeState, decodeState } from './js/persistence.js';
+  <!-- Scripts clásicos: funcionan también abriendo el archivo con doble clic. -->
+  <script src="js/constants.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/persistence.js"></script>
+  <script>
+    const { bonificacionA, escenarios, pensionEstimada } = window.RetiroEngine;
+    const { encodeState, decodeState } = window.RetiroPersistence;
 
     const out = document.getElementById('out');
     let pass = 0, fail = 0;

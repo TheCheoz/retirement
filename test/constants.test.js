@@ -1,9 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import {
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const {
   COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM,
   APV_TOPE_UF_ANUAL, TRAMOS_IMPUESTO, DEFAULTS,
-} from '../js/constants.js';
+} = require('../js/constants.js');
 
 test('cotización obligatoria AFP es 10%', () => {
   assert.equal(COTIZACION_OBLIGATORIA, 0.10);

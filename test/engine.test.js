@@ -1,6 +1,6 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios, pensionEstimada, aReal } from '../js/engine.js';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios, pensionEstimada, aReal } = require('../js/engine.js');
 
 test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
   const m = tasaMensual(0.06);

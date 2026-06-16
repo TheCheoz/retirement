@@ -8,29 +8,6 @@
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="css/app.css" />
-  <script type="module">
-    import './js/store.js';
-    import { initChart, updateChart } from './js/chart.js';
-
-    // A module runs after the DOM is parsed and after the deferred Chart.js/Alpine
-    // scripts, so the DOM and the Chart global are ready by the time this executes.
-    // Subsequent recomputations arrive via the event; the initial paint is pulled
-    // from window.__resultadoActual (set by the store before it dispatched).
-    document.addEventListener('resultado-actualizado', (e) => updateChart(e.detail));
-
-    function start() {
-      initChart(document.getElementById('grafico'));
-      if (window.__resultadoActual) updateChart(window.__resultadoActual);
-    }
-
-    if (typeof Chart !== 'undefined') {
-      start();
-    } else {
-      const iv = setInterval(() => {
-        if (typeof Chart !== 'undefined') { clearInterval(iv); start(); }
-      }, 30);
-    }
-  </script>
 </head>
 <body x-data="simulador()" x-init="init()" x-cloak class="min-h-screen">
   <div class="grid md:grid-cols-[340px_1fr] gap-4 p-4 max-w-7xl mx-auto">
@@ -135,5 +112,31 @@
       </div>
     </main>
   </div>
+
+  <!-- Lógica de la app: scripts clásicos (cargan desde file://, sin CORS).
+       Orden por dependencias; se ejecutan antes de que Alpine (defer) arranque. -->
+  <script src="js/constants.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/persistence.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/chart.js"></script>
+  <script>
+    // El gráfico escucha cada recálculo. El primer dibujo se toma de
+    // window.__resultadoActual (lo fija el store durante el init de Alpine),
+    // así no se pierde aunque el evento llegue antes de crear el chart.
+    document.addEventListener('resultado-actualizado', (e) => window.RetiroChart.updateChart(e.detail));
+    (function () {
+      function start() {
+        window.RetiroChart.initChart(document.getElementById('grafico'));
+        if (window.__resultadoActual) window.RetiroChart.updateChart(window.__resultadoActual);
+      }
+      if (typeof Chart !== 'undefined') start();
+      else {
+        const iv = setInterval(() => {
+          if (typeof Chart !== 'undefined') { clearInterval(iv); start(); }
+        }, 30);
+      }
+    })();
+  </script>
 </body>
 </html>

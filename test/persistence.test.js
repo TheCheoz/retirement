@@ -1,6 +1,6 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { encodeState, decodeState } from '../js/persistence.js';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { encodeState, decodeState } = require('../js/persistence.js');
 
 test('encode/decode son inversos (round-trip)', () => {
   const inputs = { edadActual: 30, sueldoLiquido: 1000000, retornoETF: 0.06 };
