@@ -12,26 +12,24 @@
     import './js/store.js';
     import { initChart, updateChart } from './js/chart.js';
 
-    // Buffer the latest result so an initial dispatch that happens before the
-    // chart exists is not lost — we flush it right after initChart.
-    let lastResultado = null;
-    document.addEventListener('resultado-actualizado', (e) => {
-      lastResultado = e.detail;
-      updateChart(e.detail); // no-op while chart is null
-    });
+    // A module runs after the DOM is parsed and after the deferred Chart.js/Alpine
+    // scripts, so the DOM and the Chart global are ready by the time this executes.
+    // Subsequent recomputations arrive via the event; the initial paint is pulled
+    // from window.__resultadoActual (set by the store before it dispatched).
+    document.addEventListener('resultado-actualizado', (e) => updateChart(e.detail));
 
-    window.addEventListener('DOMContentLoaded', () => {
-      // Chart.js global may not be ready until its deferred script runs; poll briefly.
-      const ready = () => typeof Chart !== 'undefined';
-      const start = () => {
-        initChart(document.getElementById('grafico'));
-        if (lastResultado) updateChart(lastResultado);
-      };
-      if (ready()) start();
-      else {
-        const iv = setInterval(() => { if (ready()) { clearInterval(iv); start(); } }, 30);
-      }
-    });
+    function start() {
+      initChart(document.getElementById('grafico'));
+      if (window.__resultadoActual) updateChart(window.__resultadoActual);
+    }
+
+    if (typeof Chart !== 'undefined') {
+      start();
+    } else {
+      const iv = setInterval(() => {
+        if (typeof Chart !== 'undefined') { clearInterval(iv); start(); }
+      }, 30);
+    }
   </script>
 </head>
 <body x-data="simulador()" x-init="init()" x-cloak class="min-h-screen">

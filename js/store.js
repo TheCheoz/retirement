@@ -42,6 +42,7 @@ export function simulador() {
         realista: pensionEstimada(this.resultado.realista.total, this.inputs.edadRetiro, this.inputs.expectativaVida),
         optimista: pensionEstimada(this.resultado.optimista.total, this.inputs.edadRetiro, this.inputs.expectativaVida),
       };
+      if (typeof window !== 'undefined') window.__resultadoActual = this.resultado;
       this.$dispatch('resultado-actualizado', this.resultado);
     },
 
