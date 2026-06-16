@@ -1,4 +1,4 @@
-import { COTIZACION_OBLIGATORIA } from './constants.js';
+import { COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM } from './constants.js';
 
 // Tasa mensual equivalente a una tasa anual compuesta.
 export function tasaMensual(tasaAnual) {
@@ -25,4 +25,9 @@ export function imponibleDesdeLiquido(sueldoLiquido, factorImponible) {
 export function aporteAFPMensual({ sueldoLiquido, factorImponible, aporteAFPManual }) {
   if (aporteAFPManual != null) return aporteAFPManual;
   return imponibleDesdeLiquido(sueldoLiquido, factorImponible) * COTIZACION_OBLIGATORIA;
+}
+
+// Bonificación estatal anual del Régimen A: 15% del aporte, tope 6 UTM/año.
+export function bonificacionA(aporteAnualA, utm) {
+  return Math.min(BONIFICACION_A_PCT * aporteAnualA, BONIFICACION_A_TOPE_UTM * utm);
 }

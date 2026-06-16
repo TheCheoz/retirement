@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual } from '../js/engine.js';
+import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA } from '../js/engine.js';
 
 test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
   const m = tasaMensual(0.06);
@@ -27,4 +27,14 @@ test('aporteAFPMensual: 10% del imponible cuando no hay override', () => {
 
 test('aporteAFPMensual: respeta el override manual', () => {
   assert.equal(aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: 90000 }), 90000);
+});
+
+test('bonificacionA: 15% del aporte anual bajo el tope', () => {
+  // aporte anual 600.000 => 15% = 90.000; tope 6 UTM*67.000 = 402.000 => no aplica tope
+  assert.equal(bonificacionA(600000, 67000), 90000);
+});
+
+test('bonificacionA: se corta en el tope de 6 UTM', () => {
+  // aporte anual 5.000.000 => 15% = 750.000; tope 6*67.000 = 402.000 => se corta
+  assert.equal(bonificacionA(5000000, 67000), 402000);
 });
