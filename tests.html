@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Tests — Motor del Simulador</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; background:#0d1117; color:#cdd; }
+    .ok { color:#4ade80; } .fail { color:#f87171; }
+    pre { background:#161b22; padding:1rem; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <h1>Tests del motor (navegador)</h1>
+  <pre id="out"></pre>
+  <script type="module">
+    import { bonificacionA, escenarios, pensionEstimada } from './js/engine.js';
+    import { encodeState, decodeState } from './js/persistence.js';
+
+    const out = document.getElementById('out');
+    let pass = 0, fail = 0;
+    function check(name, cond) {
+      const line = (cond ? '✓ ' : '✗ ') + name;
+      out.innerHTML += `<span class="${cond ? 'ok' : 'fail'}">${line}</span>\n`;
+      cond ? pass++ : fail++;
+    }
+
+    check('bonificacionA respeta tope 6 UTM', bonificacionA(5000000, 67000) === 402000);
+    check('pensionEstimada saldo/meses', pensionEstimada(120000000, 65, 85) === 500000);
+    check('encode/decode round-trip', (() => {
+      const o = { a: 1, b: 'x' }; return JSON.stringify(decodeState(encodeState(o))) === JSON.stringify(o);
+    })());
+    const e = escenarios({
+      edadActual: 30, edadRetiro: 65, expectativaVida: 85, sueldoLiquido: 1000000,
+      factorImponible: 1.22, aporteAFPManual: null, saldoAFP: 10000000, retornoAFP: 0.05,
+      apvRegimen: 'ambas', aporteAPV_A: 50000, aporteAPV_B: 50000, saldoAPV: 2000000,
+      retornoAPV: 0.04, apvFijo: false, reinvertirB: false, saldoETF: 0, aporteETF: 0,
+      retornoETF: 0.06, utm: 67000, uf: 38000, inflacion: 0.03, crecimientoSueldo: 0.04,
+      ajusteEscenario: 0.02,
+    });
+    check('optimista > realista > pesimista', e.optimista.total > e.realista.total && e.realista.total > e.pesimista.total);
+
+    out.innerHTML += `\n${fail === 0 ? '<span class="ok">TODOS PASARON</span>' : '<span class="fail">HAY FALLOS</span>'} (${pass} ok, ${fail} fail)\n`;
+  </script>
+</body>
+</html>
