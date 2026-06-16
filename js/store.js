@@ -29,11 +29,15 @@ export function simulador() {
     },
 
     recalcular() {
+      // Guarda: si los inputs no son válidos, no recalcula (mantiene último estado válido)
+      if (this.inputs.edadRetiro <= this.inputs.edadActual) return;
+      if (this.inputs.sueldoLiquido < 0 || this.inputs.utm <= 0 || this.inputs.uf <= 0) return;
       const e = escenarios(this.inputs);
-      const conv = (esc) => this.vistaReal
-        ? { ...esc, serie: aReal(esc.serie, this.inputs.inflacion, this.inputs.edadActual),
-            total: aReal(esc.serie, this.inputs.inflacion, this.inputs.edadActual).at(-1).total }
-        : esc;
+      const conv = (esc) => {
+        if (!this.vistaReal) return esc;
+        const serie = aReal(esc.serie, this.inputs.inflacion, this.inputs.edadActual);
+        return { ...esc, serie, total: serie.at(-1).total };
+      };
       this.resultado = {
         pesimista: conv(e.pesimista), realista: conv(e.realista), optimista: conv(e.optimista),
       };
@@ -54,7 +58,9 @@ export function simulador() {
     },
 
     cargarEscenario(i) {
-      this.inputs = { ...this.escenariosGuardados[i].inputs };
+      const e = this.escenariosGuardados[i];
+      if (!e) return;
+      this.inputs = { ...e.inputs };
     },
 
     eliminarEscenario(i) {
