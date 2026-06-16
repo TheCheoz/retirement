@@ -47,3 +47,72 @@ export function ahorroTributarioB(aporteAnualB, imponibleMensual, utm, uf) {
   const base = Math.min(aporteAnualB, topeAnual);
   return base * tasaMarginal(imponibleMensual, utm);
 }
+
+// Proyecta el ahorro año a año desde edadActual hasta edadRetiro (inclusive).
+// `ajuste` desplaza el retorno anual de TODAS las categorías (para escenarios).
+// Devuelve { serie:[{edad, saldoAFP, saldoAPV, saldoETF, total}], total,
+//            bonoAcumuladoA, ahorroAcumuladoB }.
+export function proyectar(inputs, ajuste = 0) {
+  const anios = inputs.edadRetiro - inputs.edadActual;
+  let saldoAFP = inputs.saldoAFP;
+  let saldoAPV = inputs.saldoAPV;
+  let saldoETF = inputs.saldoETF;
+  let bonoAcumuladoA = 0;
+  let ahorroAcumuladoB = 0;
+
+  let sueldoLiquido = inputs.sueldoLiquido;
+  let aporteA = inputs.aporteAPV_A;
+  let aporteB = inputs.aporteAPV_B;
+
+  const usaA = inputs.apvRegimen === 'A' || inputs.apvRegimen === 'ambas';
+  const usaB = inputs.apvRegimen === 'B' || inputs.apvRegimen === 'ambas';
+
+  const serie = [{
+    edad: inputs.edadActual,
+    saldoAFP, saldoAPV, saldoETF, total: saldoAFP + saldoAPV + saldoETF,
+  }];
+
+  for (let i = 0; i < anios; i++) {
+    const factorImp = inputs.factorImponible;
+    const imponibleMensual = imponibleDesdeLiquido(sueldoLiquido, factorImp);
+    const aporteAFP = aporteAFPMensual({ sueldoLiquido, factorImponible: factorImp, aporteAFPManual: inputs.aporteAFPManual });
+
+    const apvA = usaA ? aporteA : 0;
+    const apvB = usaB ? aporteB : 0;
+
+    saldoAFP = crecerAnio(saldoAFP, aporteAFP, inputs.retornoAFP + ajuste);
+    saldoAPV = crecerAnio(saldoAPV, apvA + apvB, inputs.retornoAPV + ajuste);
+    saldoETF = crecerAnio(saldoETF, inputs.aporteETF, inputs.retornoETF + ajuste);
+
+    // Beneficios anuales del APV
+    if (usaA) {
+      const bono = bonificacionA(apvA * 12, inputs.utm);
+      bonoAcumuladoA += bono;
+      saldoAPV += bono; // el bono A se deposita en el fondo
+    }
+    if (usaB) {
+      const ahorro = ahorroTributarioB(apvB * 12, imponibleMensual, inputs.utm, inputs.uf);
+      ahorroAcumuladoB += ahorro;
+      if (inputs.reinvertirB) saldoAPV += ahorro;
+    }
+
+    serie.push({
+      edad: inputs.edadActual + i + 1,
+      saldoAFP, saldoAPV, saldoETF, total: saldoAFP + saldoAPV + saldoETF,
+    });
+
+    // Crecimiento anual para el próximo año
+    sueldoLiquido *= (1 + inputs.crecimientoSueldo);
+    if (!inputs.apvFijo) {
+      aporteA *= (1 + inputs.crecimientoSueldo);
+      aporteB *= (1 + inputs.crecimientoSueldo);
+    }
+  }
+
+  return {
+    serie,
+    total: serie.at(-1).total,
+    bonoAcumuladoA,
+    ahorroAcumuladoB,
+  };
+}

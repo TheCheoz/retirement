@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB } from '../js/engine.js';
+import { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar } from '../js/engine.js';
 
 test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
   const m = tasaMensual(0.06);
@@ -58,4 +58,33 @@ test('ahorroTributarioB: aporte se limita al tope de 600 UF anual', () => {
   // tope = 600*38.000 = 22.800.000; aporte 30.000.000 => se usa 22.800.000
   // imponible en 8% => ahorro = 22.800.000 * 0.08 = 1.824.000
   assert.equal(ahorroTributarioB(30000000, 2500000, 67000, 38000), 1824000);
+});
+
+const baseInputs = {
+  edadActual: 60, edadRetiro: 62, expectativaVida: 85,
+  sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: null,
+  saldoAFP: 0, retornoAFP: 0,
+  apvRegimen: 'ambas', aporteAPV_A: 0, aporteAPV_B: 0, saldoAPV: 0, retornoAPV: 0,
+  apvFijo: true, reinvertirB: false,
+  saldoETF: 0, aporteETF: 0, retornoETF: 0,
+  utm: 67000, uf: 38000, inflacion: 0, crecimientoSueldo: 0, ajusteEscenario: 0,
+};
+
+test('proyectar: una fila por año desde edadActual hasta edadRetiro inclusive', () => {
+  const r = proyectar(baseInputs);
+  assert.equal(r.serie.length, 3); // 60, 61, 62
+  assert.equal(r.serie[0].edad, 60);
+  assert.equal(r.serie.at(-1).edad, 62);
+});
+
+test('proyectar: sin retorno ni crecimiento, AFP acumula 12*aporte por año', () => {
+  const r = proyectar(baseInputs);
+  // aporte AFP = 10% * 1.220.000 = 122.000/mes => 1.464.000/año, 2 años de aportes
+  assert.equal(Math.round(r.total), Math.round(122000 * 12 * 2));
+});
+
+test('proyectar: crecimiento de sueldo sube el aporte AFP del año 2', () => {
+  const r = proyectar({ ...baseInputs, crecimientoSueldo: 0.10 });
+  // año1 aporte 122.000, año2 aporte 134.200 => total = (122000+134200)*12
+  assert.equal(Math.round(r.total), Math.round((122000 + 134200) * 12));
 });
