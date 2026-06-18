@@ -7,41 +7,105 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Tipografía: Fraunces (display soleada) + Hanken Grotesk (cuerpo). Cae a
+       fuentes de sistema si se abre sin red (igual que los CDN de arriba). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body x-data="simulador()" x-init="init()" x-cloak class="min-h-screen">
-  <div class="grid md:grid-cols-[340px_1fr] gap-4 p-4 max-w-7xl mx-auto">
+  <div class="max-w-3xl mx-auto px-4 py-8 md:py-12">
 
-    <!-- PANEL IZQUIERDO: CONTROLES -->
-    <aside class="space-y-3">
-      <h1 class="text-lg font-bold">Simulador de Jubilación 🇨🇱</h1>
+    <!-- KICKER -->
+    <p class="kicker text-center">Simulador de jubilación · Chile 🌅</p>
 
-      <details open class="kpi"><summary class="cursor-pointer font-semibold">Perfil</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+    <!-- HÉROE: tu pensión es la tesis -->
+    <header class="hero">
+      <template x-if="resultado">
+        <div>
+          <div class="hero-label">Tu pensión proyectada a los <span x-text="inputs.edadRetiro"></span></div>
+          <div class="hero-num">
+            <span x-text="fmt(pension.realista)"></span><span class="hero-unidad"> /mes</span>
+          </div>
+          <div class="hero-frase" x-text="fraseCalida"></div>
+          <div class="hero-rango">
+            entre <b x-text="fmt(pension.pesimista)"></b> y <b x-text="fmt(pension.optimista)"></b>
+          </div>
+        </div>
+      </template>
+    </header>
+
+    <!-- GRÁFICO: horizonte de amanecer (la firma) -->
+    <div class="card mt-6" style="height:360px; padding:1rem 1.1rem;">
+      <canvas id="grafico"></canvas>
+    </div>
+
+    <!-- KPIs secundarios -->
+    <template x-if="resultado">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <div class="kpi-chip">
+          <div class="lbl">Saldo final (realista)</div>
+          <div class="val" x-text="fmt(resultado.realista.total)"></div>
+        </div>
+        <div class="kpi-chip">
+          <div class="lbl">Bono estatal A acum.</div>
+          <div class="val" x-text="fmt(resultado.realista.bonoAcumuladoA)"></div>
+        </div>
+        <div class="kpi-chip">
+          <div class="lbl">Ahorro tributario B acum.</div>
+          <div class="val" x-text="fmt(resultado.realista.ahorroAcumuladoB)"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Toggle pesos de hoy -->
+    <div class="flex justify-center mt-4">
+      <label class="toggle"><input type="checkbox" x-model="vistaReal"> Ver en pesos de hoy (real)</label>
+    </div>
+
+    <!-- Revelar controles -->
+    <div class="flex justify-center mt-6">
+      <button type="button" class="btn btn-revelar"
+              :aria-expanded="controlesAbiertos"
+              @click="controlesAbiertos = !controlesAbiertos">
+        <span class="chev">⌄</span> Ajustar mis datos
+      </button>
+    </div>
+
+    <!-- HOJA DE CONTROLES -->
+    <section class="card sheet" x-show="controlesAbiertos" x-transition.opacity x-cloak>
+
+      <div class="grupo">
+        <div class="grupo-titulo">Perfil</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <label class="field">Edad actual<input type="number" x-model.number="inputs.edadActual"></label>
           <label class="field">Edad retiro<input type="number" x-model.number="inputs.edadRetiro" :class="inputs.edadRetiro <= inputs.edadActual && 'invalid'"></label>
           <label class="field">Expectativa vida<input type="number" x-model.number="inputs.expectativaVida"></label>
         </div>
-      </details>
+      </div>
 
-      <details class="kpi"><summary class="cursor-pointer font-semibold">Ingresos</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+      <div class="grupo">
+        <div class="grupo-titulo">Ingresos</div>
+        <div class="grid grid-cols-2 gap-3">
           <label class="field">Sueldo líquido<input type="number" x-model.number="inputs.sueldoLiquido"></label>
           <label class="field">Factor imponible<input type="number" step="0.01" x-model.number="inputs.factorImponible"></label>
           <label class="field">Aporte AFP (manual)<input type="number" placeholder="auto" x-model.number="inputs.aporteAFPManual"></label>
           <label class="field">Crec. sueldo %<input type="number" step="0.01" :value="inputs.crecimientoSueldo*100" @input="$event.target.value!==''&&(inputs.crecimientoSueldo=$event.target.value/100)"></label>
         </div>
-      </details>
+      </div>
 
-      <details class="kpi"><summary class="cursor-pointer font-semibold">AFP</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+      <div class="grupo">
+        <div class="grupo-titulo">AFP</div>
+        <div class="grid grid-cols-2 gap-3">
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAFP"></label>
           <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAFP*100" @input="$event.target.value!==''&&(inputs.retornoAFP=$event.target.value/100)"></label>
         </div>
-      </details>
+      </div>
 
-      <details class="kpi"><summary class="cursor-pointer font-semibold">APV</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+      <div class="grupo">
+        <div class="grupo-titulo">APV</div>
+        <div class="grid grid-cols-2 gap-3">
           <label class="field col-span-2">Régimen
             <select x-model="inputs.apvRegimen"><option value="A">A</option><option value="B">B</option><option value="ambas">Ambas</option></select>
           </label>
@@ -49,68 +113,50 @@
           <label class="field">Aporte B /mes<input type="number" x-model.number="inputs.aporteAPV_B"></label>
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAPV"></label>
           <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAPV*100" @input="$event.target.value!==''&&(inputs.retornoAPV=$event.target.value/100)"></label>
-          <label class="field flex-row items-center gap-2"><input type="checkbox" x-model="inputs.apvFijo"> APV fijo</label>
-          <label class="field flex-row items-center gap-2"><input type="checkbox" x-model="inputs.reinvertirB"> Reinvertir ahorro B</label>
+          <label class="field check"><input type="checkbox" x-model="inputs.apvFijo"> APV fijo</label>
+          <label class="field check"><input type="checkbox" x-model="inputs.reinvertirB"> Reinvertir ahorro B</label>
         </div>
-      </details>
+      </div>
 
-      <details class="kpi"><summary class="cursor-pointer font-semibold">ETF</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+      <div class="grupo">
+        <div class="grupo-titulo">ETF</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoETF"></label>
           <label class="field">Aporte /mes<input type="number" x-model.number="inputs.aporteETF"></label>
           <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoETF*100" @input="$event.target.value!==''&&(inputs.retornoETF=$event.target.value/100)"></label>
         </div>
-      </details>
+      </div>
 
-      <details class="kpi"><summary class="cursor-pointer font-semibold">Supuestos</summary>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+      <div class="grupo">
+        <div class="grupo-titulo">Supuestos</div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <label class="field">UTM<input type="number" x-model.number="inputs.utm"></label>
           <label class="field">UF<input type="number" x-model.number="inputs.uf"></label>
           <label class="field">Inflación %<input type="number" step="0.01" :value="inputs.inflacion*100" @input="$event.target.value!==''&&(inputs.inflacion=$event.target.value/100)"></label>
           <label class="field">Ajuste escenario ±%<input type="number" step="0.01" :value="inputs.ajusteEscenario*100" @input="$event.target.value!==''&&(inputs.ajusteEscenario=$event.target.value/100)"></label>
         </div>
-      </details>
-
-      <div class="flex gap-2">
-        <button @click="reset()" class="kpi flex-1 text-sm">Reset</button>
-        <button @click="guardarEscenario()" class="kpi flex-1 text-sm">Guardar</button>
-        <button @click="compartir()" class="kpi flex-1 text-sm">Compartir</button>
-      </div>
-    </aside>
-
-    <!-- PANEL DERECHO: RESULTADOS -->
-    <main class="space-y-4">
-      <div class="flex items-center justify-between">
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="vistaReal"> Ver en pesos de hoy (real)</label>
       </div>
 
-      <template x-if="resultado"><div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="kpi"><div class="text-xs text-gray-400">Saldo final (realista)</div>
-          <div class="text-xl font-bold text-blue-400" x-text="fmt(resultado.realista.total)"></div>
-          <div class="text-xs text-gray-500"><span x-text="fmt(resultado.pesimista.total)"></span> – <span x-text="fmt(resultado.optimista.total)"></span></div>
-        </div>
-        <div class="kpi"><div class="text-xs text-gray-400">Pensión mensual (est.)</div>
-          <div class="text-xl font-bold text-green-400" x-text="fmt(pension.realista)"></div></div>
-        <div class="kpi"><div class="text-xs text-gray-400">Bono estatal A acum.</div>
-          <div class="text-lg font-bold" x-text="fmt(resultado.realista.bonoAcumuladoA)"></div></div>
-        <div class="kpi"><div class="text-xs text-gray-400">Ahorro tributario B acum.</div>
-          <div class="text-lg font-bold" x-text="fmt(resultado.realista.ahorroAcumuladoB)"></div></div>
-      </div></template>
-
-      <div class="kpi" style="height:380px"><canvas id="grafico"></canvas></div>
-
-      <div class="kpi" x-show="escenariosGuardados.length">
-        <div class="text-sm font-semibold mb-2">Escenarios guardados</div>
-        <div class="flex flex-wrap gap-2">
-          <template x-for="(e, i) in escenariosGuardados" :key="i">
-            <span class="flex items-center gap-1 bg-gray-800 rounded-full px-3 py-1 text-sm">
-              <button @click="cargarEscenario(i)" x-text="e.nombre"></button>
-              <button @click="eliminarEscenario(i)" class="text-red-400">×</button>
-            </span>
-          </template>
-        </div>
+      <div class="flex flex-wrap gap-2 mt-5">
+        <button type="button" @click="reset()" class="btn">Reset</button>
+        <button type="button" @click="guardarEscenario()" class="btn btn-sol">Guardar escenario</button>
+        <button type="button" @click="compartir()" class="btn">Compartir</button>
       </div>
-    </main>
+    </section>
+
+    <!-- Escenarios guardados -->
+    <div class="mt-5" x-show="escenariosGuardados.length" x-cloak>
+      <div class="text-sm mb-2" style="color:var(--ink-soft)">Escenarios guardados</div>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="(e, i) in escenariosGuardados" :key="i">
+          <span class="tag">
+            <button type="button" @click="cargarEscenario(i)" x-text="e.nombre"></button>
+            <button type="button" @click="eliminarEscenario(i)" class="quitar" aria-label="Eliminar">×</button>
+          </span>
+        </template>
+      </div>
+    </div>
+
   </div>
 
   <!-- Lógica de la app: scripts clásicos (cargan desde file://, sin CORS).

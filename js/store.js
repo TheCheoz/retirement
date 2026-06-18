@@ -15,6 +15,8 @@
       escenariosGuardados: loadScenarios(),
       resultado: null,
       pension: { pesimista: 0, realista: 0, optimista: 0 },
+      // Controles abiertos por defecto en desktop, cerrados en móvil (el héroe respira).
+      controlesAbiertos: typeof window !== 'undefined' && window.innerWidth >= 768,
 
       init() {
         this.recalcular();
@@ -93,6 +95,16 @@
 
       get fmt() {
         return (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
+      },
+
+      // Frase cálida según la pensión realista mostrada (sigue la vista real/nominal).
+      get fraseCalida() {
+        const p = this.pension.realista || 0;
+        if (p < 300000) return 'es un comienzo — pequeños ajustes suman mucho';
+        if (p < 600000) return 'vas tomando forma 🌤️';
+        if (p < 1000000) return 'vas bien encaminado 🌱';
+        if (p < 1800000) return 'se ve bien 😊';
+        return 'tu futuro brilla ✨';
       },
     };
   }

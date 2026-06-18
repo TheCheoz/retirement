@@ -1,10 +1,160 @@
-/* css/app.css — ajustes sobre Tailwind */
-[x-cloak] { display: none !important; }
-body { background: #0d1117; color: #e6edf3; }
-.field { display: flex; flex-direction: column; gap: .25rem; font-size: .875rem; }
-.field input, .field select {
-  background:#161b22; border:1px solid #30363d; border-radius:6px;
-  padding:.4rem .5rem; color:#e6edf3;
+/* css/app.css — Identidad "Amanecer" sobre Tailwind.
+   Tokens como CSS variables + capa pequeña de clases semánticas.
+   La audacia se gasta en el gráfico (firma); aquí todo queda quieto y cálido. */
+
+:root {
+  --bg:        #FBF6EE;   /* hueso cálido — lienzo */
+  --surface:   #FFFCF7;   /* tarjetas, controles */
+  --border:    #EADFCE;   /* bordes suaves */
+  --ink:       #2A2320;   /* casi-negro cálido — texto */
+  --ink-soft:  #8A7E72;   /* etiquetas, secundario */
+  --sol:       #E8923A;   /* ámbar — realista / acento estrella */
+  --terracota: #C75D43;   /* alba — pesimista / énfasis */
+  --brote:     #6FA368;   /* día pleno — optimista / crecimiento */
+  --radio:     14px;
 }
-.field input.invalid { border-color:#f87171; }
-.kpi { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:1rem; }
+
+[x-cloak] { display: none !important; }
+
+* { box-sizing: border-box; }
+
+body {
+  /* Amanecer apenas insinuado: un velo cálido arriba que se disuelve en el papel. */
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(232,146,58,.16), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* ── Tipografía display ───────────────────────────────────────────── */
+.display { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; }
+
+.kicker {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: .8rem; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--sol);
+}
+
+/* ── Héroe ────────────────────────────────────────────────────────── */
+.hero { text-align: center; padding: 1.5rem 0 .5rem; }
+
+.hero-label { color: var(--ink-soft); font-size: 1rem; letter-spacing: .01em; }
+
+.hero-num {
+  font-family: 'Fraunces', Georgia, serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: clamp(3rem, 11vw, 6.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: .35rem 0 .1rem;
+  font-variant-numeric: tabular-nums;
+  transition: opacity .35s ease;
+}
+.hero-unidad { font-size: .42em; color: var(--ink-soft); font-weight: 500; letter-spacing: 0; }
+
+.hero-frase {
+  font-family: 'Fraunces', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+  color: var(--terracota);
+}
+
+.hero-rango {
+  display: inline-flex; align-items: center; gap: .5rem;
+  margin-top: .9rem; padding: .35rem .9rem;
+  font-size: .85rem; color: var(--ink-soft);
+  background: linear-gradient(90deg, rgba(199,93,67,.10), rgba(232,146,58,.14), rgba(111,163,90,.12));
+  border-radius: 999px;
+}
+.hero-rango b { color: var(--ink); font-weight: 600; }
+
+/* ── Tarjetas / chips ─────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radio);
+  box-shadow: 0 1px 2px rgba(42,35,32,.03), 0 8px 24px -16px rgba(42,35,32,.18);
+}
+
+.kpi-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radio);
+  padding: .85rem 1rem;
+}
+.kpi-chip .lbl { font-size: .72rem; color: var(--ink-soft); letter-spacing: .02em; }
+.kpi-chip .val { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 1.35rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ── Toggle "pesos de hoy" ────────────────────────────────────────── */
+.toggle { display: inline-flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--ink-soft); cursor: pointer; }
+
+/* ── Botones ──────────────────────────────────────────────────────── */
+.btn {
+  font: inherit; cursor: pointer;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink);
+  padding: .5rem 1.1rem; font-size: .9rem;
+  transition: background .15s ease, border-color .15s ease, transform .05s ease;
+}
+.btn:hover { background: #FFF7EC; border-color: #E0CFB4; }
+.btn:active { transform: translateY(1px); }
+
+.btn-sol {
+  border-color: transparent; color: #fff;
+  background: linear-gradient(180deg, #F2A94C, var(--sol));
+  font-weight: 600;
+}
+.btn-sol:hover { background: linear-gradient(180deg, #F0A03C, #DF8530); border-color: transparent; }
+
+.btn-revelar {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .7rem 1.4rem;
+}
+.btn-revelar .chev { transition: transform .25s ease; }
+.btn-revelar[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+/* ── Hoja de controles ────────────────────────────────────────────── */
+.sheet { margin-top: 1rem; padding: 1.25rem; }
+
+.grupo + .grupo { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px dashed var(--border); }
+.grupo-titulo {
+  font-family: 'Fraunces', Georgia, serif; font-weight: 600;
+  font-size: .95rem; color: var(--ink); margin-bottom: .6rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.grupo-titulo::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--sol); }
+
+.field { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; color: var(--ink-soft); }
+.field input, .field select {
+  background: #FFFDFA; border: 1px solid var(--border); border-radius: 8px;
+  padding: .45rem .55rem; color: var(--ink); font: inherit; font-size: .9rem;
+  font-variant-numeric: tabular-nums;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field input:hover, .field select:hover { border-color: #E0CFB4; }
+.field input.invalid { border-color: var(--terracota); }
+.field.check { flex-direction: row; align-items: center; gap: .5rem; color: var(--ink); font-size: .85rem; }
+
+input[type="checkbox"], select, input { accent-color: var(--sol); }
+
+/* ── Escenarios guardados ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #FFF7EC; border: 1px solid var(--border);
+  border-radius: 999px; padding: .25rem .8rem; font-size: .85rem; color: var(--ink);
+}
+.tag .quitar { color: var(--terracota); font-weight: 700; line-height: 1; }
+
+/* ── Piso de calidad ──────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--sol); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
