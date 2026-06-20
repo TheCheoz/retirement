@@ -1,33 +1,33 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM,
-  APV_TOPE_UF_ANUAL, TRAMOS_IMPUESTO, DEFAULTS,
+  MANDATORY_CONTRIBUTION, BONUS_A_PCT, BONUS_A_CAP_UTM,
+  APV_CAP_UF_ANNUAL, TAX_BRACKETS, DEFAULTS,
 } = require('../js/constants.js');
 
-test('cotización obligatoria AFP es 10%', () => {
-  assert.equal(COTIZACION_OBLIGATORIA, 0.10);
+test('mandatory AFP contribution is 10%', () => {
+  assert.equal(MANDATORY_CONTRIBUTION, 0.10);
 });
 
-test('bonificación A: 15% con tope 6 UTM', () => {
-  assert.equal(BONIFICACION_A_PCT, 0.15);
-  assert.equal(BONIFICACION_A_TOPE_UTM, 6);
+test('bonus A: 15% capped at 6 UTM', () => {
+  assert.equal(BONUS_A_PCT, 0.15);
+  assert.equal(BONUS_A_CAP_UTM, 6);
 });
 
-test('tope APV con beneficio tributario: 600 UF anual', () => {
-  assert.equal(APV_TOPE_UF_ANUAL, 600);
+test('APV cap with tax benefit: 600 UF annual', () => {
+  assert.equal(APV_CAP_UF_ANNUAL, 600);
 });
 
-test('tramos de impuesto cubren desde 0 y están ordenados', () => {
-  assert.equal(TRAMOS_IMPUESTO[0].desde, 0);
-  for (let i = 1; i < TRAMOS_IMPUESTO.length; i++) {
-    assert.equal(TRAMOS_IMPUESTO[i].desde, TRAMOS_IMPUESTO[i - 1].hasta);
+test('tax brackets cover from 0 and are ordered', () => {
+  assert.equal(TAX_BRACKETS[0].from, 0);
+  for (let i = 1; i < TAX_BRACKETS.length; i++) {
+    assert.equal(TAX_BRACKETS[i].from, TAX_BRACKETS[i - 1].to);
   }
 });
 
-test('DEFAULTS trae todos los inputs base', () => {
-  for (const k of ['edadActual','edadRetiro','expectativaVida','sueldoLiquido',
-    'factorImponible','utm','uf','inflacion','crecimientoSueldo','ajusteEscenario']) {
-    assert.ok(k in DEFAULTS, `falta default ${k}`);
+test('DEFAULTS includes all base inputs', () => {
+  for (const k of ['currentAge','retirementAge','lifeExpectancy','netSalary',
+    'taxableFactor','utm','uf','inflation','salaryGrowth','scenarioAdjustment']) {
+    assert.ok(k in DEFAULTS, `missing default ${k}`);
   }
 });

@@ -3,186 +3,170 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Simulador de Jubilación · Chile</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- Tipografía: Fraunces (display soleada) + Hanken Grotesk (cuerpo). Cae a
-       fuentes de sistema si se abre sin red (igual que los CDN de arriba). -->
+  <title>Simulador de Pensión · Chile</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css" />
-</head>
-<body x-data="simulador()" x-init="init()" x-cloak class="min-h-screen">
-  <div class="max-w-3xl mx-auto px-4 py-8 md:py-12">
-
-    <!-- KICKER -->
-    <p class="kicker text-center">Simulador de jubilación · Chile 🌅</p>
-
-    <!-- HÉROE: tu pensión es la tesis -->
-    <header class="hero">
-      <template x-if="resultado">
-        <div>
-          <div class="hero-label">Tu pensión proyectada a los <span x-text="inputs.edadRetiro"></span></div>
-          <div class="hero-num">
-            <span x-text="fmt(pension.realista)"></span><span class="hero-unidad"> /mes</span>
-          </div>
-          <div class="hero-frase" x-text="fraseCalida"></div>
-          <div class="hero-rango">
-            entre <b x-text="fmt(pension.pesimista)"></b> y <b x-text="fmt(pension.optimista)"></b>
-          </div>
-        </div>
-      </template>
-    </header>
-
-    <!-- GRÁFICO: horizonte de amanecer (la firma) -->
-    <div class="card mt-6" style="height:360px; padding:1rem 1.1rem;">
-      <canvas id="grafico"></canvas>
-    </div>
-
-    <!-- KPIs secundarios -->
-    <template x-if="resultado">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-        <div class="kpi-chip">
-          <div class="lbl">Saldo final (realista)</div>
-          <div class="val" x-text="fmt(resultado.realista.total)"></div>
-        </div>
-        <div class="kpi-chip">
-          <div class="lbl">Bono estatal A acum.</div>
-          <div class="val" x-text="fmt(resultado.realista.bonoAcumuladoA)"></div>
-        </div>
-        <div class="kpi-chip">
-          <div class="lbl">Ahorro tributario B acum.</div>
-          <div class="val" x-text="fmt(resultado.realista.ahorroAcumuladoB)"></div>
-        </div>
-      </div>
-    </template>
-
-    <!-- Toggle pesos de hoy -->
-    <div class="flex justify-center mt-4">
-      <label class="toggle"><input type="checkbox" x-model="vistaReal"> Ver en pesos de hoy (real)</label>
-    </div>
-
-    <!-- Revelar controles -->
-    <div class="flex justify-center mt-6">
-      <button type="button" class="btn btn-revelar"
-              :aria-expanded="controlesAbiertos"
-              @click="controlesAbiertos = !controlesAbiertos">
-        <span class="chev">⌄</span> Ajustar mis datos
-      </button>
-    </div>
-
-    <!-- HOJA DE CONTROLES -->
-    <section class="card sheet" x-show="controlesAbiertos" x-transition.opacity x-cloak>
-
-      <div class="grupo">
-        <div class="grupo-titulo">Perfil</div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <label class="field">Edad actual<input type="number" x-model.number="inputs.edadActual"></label>
-          <label class="field">Edad retiro<input type="number" x-model.number="inputs.edadRetiro" :class="inputs.edadRetiro <= inputs.edadActual && 'invalid'"></label>
-          <label class="field">Expectativa vida<input type="number" x-model.number="inputs.expectativaVida"></label>
-        </div>
-      </div>
-
-      <div class="grupo">
-        <div class="grupo-titulo">Ingresos</div>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="field">Sueldo líquido<input type="number" x-model.number="inputs.sueldoLiquido"></label>
-          <label class="field">Factor imponible<input type="number" step="0.01" x-model.number="inputs.factorImponible"></label>
-          <label class="field">Aporte AFP (manual)<input type="number" placeholder="auto" x-model.number="inputs.aporteAFPManual"></label>
-          <label class="field">Crec. sueldo %<input type="number" step="0.01" :value="inputs.crecimientoSueldo*100" @input="$event.target.value!==''&&(inputs.crecimientoSueldo=$event.target.value/100)"></label>
-        </div>
-      </div>
-
-      <div class="grupo">
-        <div class="grupo-titulo">AFP</div>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAFP"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAFP*100" @input="$event.target.value!==''&&(inputs.retornoAFP=$event.target.value/100)"></label>
-        </div>
-      </div>
-
-      <div class="grupo">
-        <div class="grupo-titulo">APV</div>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="field col-span-2">Régimen
-            <select x-model="inputs.apvRegimen"><option value="A">A</option><option value="B">B</option><option value="ambas">Ambas</option></select>
-          </label>
-          <label class="field">Aporte A /mes<input type="number" x-model.number="inputs.aporteAPV_A"></label>
-          <label class="field">Aporte B /mes<input type="number" x-model.number="inputs.aporteAPV_B"></label>
-          <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoAPV"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoAPV*100" @input="$event.target.value!==''&&(inputs.retornoAPV=$event.target.value/100)"></label>
-          <label class="field check"><input type="checkbox" x-model="inputs.apvFijo"> APV fijo</label>
-          <label class="field check"><input type="checkbox" x-model="inputs.reinvertirB"> Reinvertir ahorro B</label>
-        </div>
-      </div>
-
-      <div class="grupo">
-        <div class="grupo-titulo">ETF</div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <label class="field">Saldo inicial<input type="number" x-model.number="inputs.saldoETF"></label>
-          <label class="field">Aporte /mes<input type="number" x-model.number="inputs.aporteETF"></label>
-          <label class="field">Retorno anual %<input type="number" step="0.01" :value="inputs.retornoETF*100" @input="$event.target.value!==''&&(inputs.retornoETF=$event.target.value/100)"></label>
-        </div>
-      </div>
-
-      <div class="grupo">
-        <div class="grupo-titulo">Supuestos</div>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <label class="field">UTM<input type="number" x-model.number="inputs.utm"></label>
-          <label class="field">UF<input type="number" x-model.number="inputs.uf"></label>
-          <label class="field">Inflación %<input type="number" step="0.01" :value="inputs.inflacion*100" @input="$event.target.value!==''&&(inputs.inflacion=$event.target.value/100)"></label>
-          <label class="field">Ajuste escenario ±%<input type="number" step="0.01" :value="inputs.ajusteEscenario*100" @input="$event.target.value!==''&&(inputs.ajusteEscenario=$event.target.value/100)"></label>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2 mt-5">
-        <button type="button" @click="reset()" class="btn">Reset</button>
-        <button type="button" @click="guardarEscenario()" class="btn btn-sol">Guardar escenario</button>
-        <button type="button" @click="compartir()" class="btn">Compartir</button>
-      </div>
-    </section>
-
-    <!-- Escenarios guardados -->
-    <div class="mt-5" x-show="escenariosGuardados.length" x-cloak>
-      <div class="text-sm mb-2" style="color:var(--ink-soft)">Escenarios guardados</div>
-      <div class="flex flex-wrap gap-2">
-        <template x-for="(e, i) in escenariosGuardados" :key="i">
-          <span class="tag">
-            <button type="button" @click="cargarEscenario(i)" x-text="e.nombre"></button>
-            <button type="button" @click="eliminarEscenario(i)" class="quitar" aria-label="Eliminar">×</button>
-          </span>
-        </template>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Lógica de la app: scripts clásicos (cargan desde file://, sin CORS).
-       Orden por dependencias; se ejecutan antes de que Alpine (defer) arranque. -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{background:#F1EDE4}
+    [x-cloak]{display:none!important}
+    input[type=range]{width:100%;accent-color:#2C7A6B;height:26px;cursor:pointer}
+    input[type=checkbox]{accent-color:#2C7A6B;width:17px;height:17px;cursor:pointer}
+    select,input[type=number]{font-family:'Hanken Grotesk',sans-serif}
+    .simp-num{font-variant-numeric:tabular-nums}
+    .simp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+    @media(max-width:560px){.simp-stats{grid-template-columns:1fr}}
+  </style>
+  <!-- App logic: classic scripts (load from file://, no CORS).
+       Order follows dependencies; they run before Alpine (defer) boots. -->
   <script src="js/constants.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/persistence.js"></script>
   <script src="js/store.js"></script>
-  <script src="js/chart.js"></script>
-  <script>
-    // El gráfico escucha cada recálculo. El primer dibujo se toma de
-    // window.__resultadoActual (lo fija el store durante el init de Alpine),
-    // así no se pierde aunque el evento llegue antes de crear el chart.
-    document.addEventListener('resultado-actualizado', (e) => window.RetiroChart.updateChart(e.detail));
-    (function () {
-      function start() {
-        window.RetiroChart.initChart(document.getElementById('grafico'));
-        if (window.__resultadoActual) window.RetiroChart.updateChart(window.__resultadoActual);
-      }
-      if (typeof Chart !== 'undefined') start();
-      else {
-        const iv = setInterval(() => {
-          if (typeof Chart !== 'undefined') { clearInterval(iv); start(); }
-        }, 30);
-      }
-    })();
-  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="simulator()" x-init="init()" x-cloak>
+<div style="min-height:100vh;background:radial-gradient(120% 80% at 50% 0%, #FBF8F1 0%, #F1EDE4 55%, #EDE8DD 100%);font-family:'Hanken Grotesk',sans-serif;color:#1F1D18;padding:40px 20px 70px">
+  <div style="max-width:840px;margin:0 auto">
+
+    <!-- hero -->
+    <div style="text-align:center;margin-bottom:30px">
+      <div style="font-size:14px;color:#8A857A;margin-bottom:10px">Tu pensión proyectada al retiro</div>
+      <div class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:clamp(54px,13vw,104px);line-height:0.92;letter-spacing:-0.02em;color:#1F1D18"><span x-text="view.heroAmount"></span><span style="font-size:0.3em;font-weight:500;color:#8A857A;letter-spacing:0"> /mes</span></div>
+      <div style="margin-top:10px"><span :style="view.statusStyle" x-text="view.statusWord"></span></div>
+      <div style="margin-top:16px;display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6E1D6;border-radius:99px;padding:7px 16px;font-size:13px;color:#57534A">entre <strong class="simp-num" style="color:#1F1D18;font-weight:600" x-text="view.rangeLow"></strong> y <strong class="simp-num" style="color:#1F1D18;font-weight:600" x-text="view.rangeHigh"></strong></div>
+      <div style="max-width:430px;margin:16px auto 0;font-size:12.5px;line-height:1.5;color:#A39E92">Monto inicial bajo Retiro Programado, líquido (descontado el 7% de salud). Una Renta Vitalicia sería algo menor pero fija de por vida.</div>
+    </div>
+
+    <!-- scenario chips -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;margin-bottom:18px">
+      <template x-for="chip in view.chips" :key="chip.key">
+        <button @click="setActive(chip.key)" :style="chip.style">
+          <span style="font-size:11px;font-weight:600;letter-spacing:0.04em" :style="chip.labelColor" x-text="chip.name"></span>
+          <span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px" :style="chip.valueColor" x-text="chip.pension"></span>
+        </button>
+      </template>
+      <button @click="comparar = !comparar" :style="view.compararStyle">⇄ Comparar los 3</button>
+    </div>
+
+    <!-- chart card -->
+    <div style="background:#fff;border:1px solid #EBE6DB;border-radius:18px;padding:22px 22px 16px;box-shadow:0 1px 2px rgba(31,29,24,0.04),0 12px 28px -18px rgba(31,29,24,0.18);margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+        <div style="font-size:13px;font-weight:600;color:#57534A" x-text="view.chartTitle"></div>
+        <div style="font-size:12px;color:#A39E92" x-text="view.chartUnit"></div>
+      </div>
+      <svg viewBox="0 0 1000 380" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block;overflow:visible;font-family:'Hanken Grotesk',sans-serif" x-html="view.svgInner"></svg>
+      <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:8px">
+        <template x-for="(lg, i) in view.legend" :key="'lg'+i">
+          <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:#57534A">
+            <span style="width:18px;height:3px;border-radius:99px;display:inline-block" :style="'background:'+lg.color"></span><span x-text="lg.label"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- stats / compare -->
+    <template x-if="comparar">
+      <div style="background:#fff;border:1px solid #EBE6DB;border-radius:18px;padding:8px 8px;margin-bottom:16px;box-shadow:0 1px 2px rgba(31,29,24,0.04)">
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:0;padding:10px 14px;font-size:11.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#A39E92">
+          <div>Escenario</div><div style="text-align:right">Pensión /mes</div><div style="text-align:right">Saldo final</div>
+        </div>
+        <template x-for="(row, i) in view.compareRows" :key="'r'+i">
+          <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:0;align-items:center;padding:13px 14px;border-radius:12px" :style="'background:'+row.bg">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#1F1D18"><span style="width:9px;height:9px;border-radius:50%" :style="'background:'+row.color"></span><span x-text="row.name"></span><span :style="row.badge">mejor</span></div>
+            <div class="simp-num" style="text-align:right;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px;color:#1F1D18" x-text="row.pension"></div>
+            <div class="simp-num" style="text-align:right;font-size:14px;color:#57534A" x-text="row.saldo"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+    <template x-if="!comparar">
+      <div class="simp-stats">
+        <template x-for="(st, i) in view.stats" :key="'s'+i">
+          <div style="background:#fff;border:1px solid #EBE6DB;border-radius:14px;padding:16px 16px;box-shadow:0 1px 2px rgba(31,29,24,0.04)">
+            <div style="font-size:12px;color:#8A857A;margin-bottom:7px;line-height:1.3" x-text="st.label"></div>
+            <div class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:20px;color:#1F1D18" x-text="st.val"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- real toggle + controls toggle -->
+    <div style="display:flex;justify-content:center;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:22px">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:#57534A;cursor:pointer"><input type="checkbox" x-model="verReal">Ver en pesos de hoy (real)</label>
+      <button @click="controlsOpen = !controlsOpen" style="display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6E1D6;border-radius:99px;padding:9px 20px;font-family:'Hanken Grotesk',sans-serif;font-size:13.5px;font-weight:600;color:#2C7A6B;cursor:pointer;box-shadow:0 1px 2px rgba(31,29,24,0.05)"><span x-text="controlsOpen ? '▾' : '▸'"></span> <span x-text="controlsOpen ? 'Ocultar mis datos' : 'Ajustar mis datos'"></span></button>
+    </div>
+
+    <!-- controls -->
+    <div x-show="controlsOpen" x-cloak style="background:#fff;border:1px solid #EBE6DB;border-radius:20px;padding:26px 26px 22px;box-shadow:0 1px 2px rgba(31,29,24,0.04),0 18px 40px -26px rgba(31,29,24,0.22)">
+      <div style="position:sticky;top:0;z-index:5;background:#fff;display:flex;justify-content:space-between;align-items:center;padding:14px 0 18px;margin-bottom:6px;border-bottom:1px solid #F0ECE2">
+        <div><div style="font-size:12px;color:#8A857A">Editando · <strong style="color:#2C7A6B" x-text="view.activeName"></strong></div><div class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px;color:#1F1D18" x-text="view.heroAmount"></div></div>
+        <div class="simp-num" style="font-size:13px;color:#A39E92;text-align:right"><span x-text="view.rangeLow"></span> – <span x-text="view.rangeHigh"></span></div>
+      </div>
+
+      <!-- Perfil -->
+      <div style="display:flex;align-items:center;gap:9px;margin:22px 0 14px"><span style="width:8px;height:8px;border-radius:50%;background:#2C7A6B"></span><span style="font-weight:600;font-size:15px">Perfil</span></div>
+      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Edad actual</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="s().currentAge + ' años'"></span></div><input type="range" min="25" max="60" step="1" :value="s().currentAge" @input="update('currentAge', +$event.target.value)"></div>
+
+      <!-- Ingresos -->
+      <div style="display:flex;align-items:center;gap:9px;margin:24px 0 14px;padding-top:18px;border-top:1px solid #F0ECE2"><span style="width:8px;height:8px;border-radius:50%;background:#2C7A6B"></span><span style="font-weight:600;font-size:15px">Ingresos</span></div>
+      <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Sueldo líquido</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="fmt(s().netSalary)"></span></div><input type="range" min="300000" max="6000000" step="50000" :value="s().netSalary" @input="update('netSalary', +$event.target.value)"></div>
+      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Crecimiento anual del sueldo</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="(s().salaryGrowth*100).toFixed(1)+'%'"></span></div><input type="range" min="0" max="8" step="0.5" :value="s().salaryGrowth*100" @input="update('salaryGrowth', +$event.target.value/100)"></div>
+
+      <!-- AFP -->
+      <div style="display:flex;align-items:center;gap:9px;margin:24px 0 14px;padding-top:18px;border-top:1px solid #F0ECE2"><span style="width:8px;height:8px;border-radius:50%;background:#2C7A6B"></span><span style="font-weight:600;font-size:15px" title="Administradora de Fondos de Pensiones: el ahorro previsional obligatorio (10% de tu sueldo imponible).">AFP</span></div>
+      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Saldo inicial acumulado</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="fmt(s().afpBalance)"></span></div><input type="range" min="0" max="120000000" step="500000" :value="s().afpBalance" @input="update('afpBalance', +$event.target.value)"></div>
+
+      <!-- APV -->
+      <div style="display:flex;align-items:center;gap:9px;margin:24px 0 14px;padding-top:18px;border-top:1px solid #F0ECE2"><span style="width:8px;height:8px;border-radius:50%;background:#2C7A6B"></span><span style="font-weight:600;font-size:15px" title="Ahorro Previsional Voluntario: ahorro extra para tu pensión, con beneficios tributarios (Régimen A o B).">APV</span></div>
+      <div x-show="!view.activeHasApv" x-cloak style="margin-bottom:14px;font-size:12.5px;line-height:1.45;color:#A39E92;background:#FBF8F1;border:1px solid #EFEAE0;border-radius:10px;padding:10px 12px">Estos aportes definen las estrategias <strong style="color:#2C7A6B">Con APV</strong> y <strong style="color:#2C7A6B">Desde los 35</strong>. <strong>Hoy</strong> es tu línea base <em>sin</em> APV, así que no los aplica.</div>
+      <div style="margin-bottom:14px"><div style="font-size:13.5px;color:#57534A;margin-bottom:6px" title="A: bonificación estatal directa. B: rebaja de impuestos según tu tramo.">Régimen tributario</div><select :value="s().apvRegime" @change="update('apvRegime', $event.target.value)" style="width:100%;padding:11px 13px;border:1px solid #E6E1D6;border-radius:10px;font-size:14px;color:#1F1D18;background:#FBFAF6;cursor:pointer"><option value="none">Sin APV</option><option value="A">Solo Régimen A</option><option value="B">Solo Régimen B</option><option value="both">Ambos (A + B)</option></select></div>
+      <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Aporte Régimen A /mes</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="fmt(s().apvContributionA)"></span></div><input type="range" min="0" max="500000" step="5000" :value="s().apvContributionA" @input="update('apvContributionA', +$event.target.value)"></div>
+      <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Aporte Régimen B /mes</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="fmt(s().apvContributionB)"></span></div><input type="range" min="0" max="500000" step="5000" :value="s().apvContributionB" @input="update('apvContributionB', +$event.target.value)"></div>
+      <div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Saldo APV inicial</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="fmt(s().apvBalance)"></span></div><input type="range" min="0" max="60000000" step="500000" :value="s().apvBalance" @input="update('apvBalance', +$event.target.value)"></div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:4px"><label style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:#57534A;cursor:pointer" title="Mantener el aporte constante, sin indexarlo al crecimiento del sueldo."><input type="checkbox" :checked="s().apvFixed" @change="update('apvFixed', $event.target.checked)">Aporte fijo</label><label style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:#57534A;cursor:pointer" title="Reinvertir la rebaja de impuestos del Régimen B dentro del mismo APV."><input type="checkbox" :checked="s().reinvestB" @change="update('reinvestB', $event.target.checked)">Reinvertir ahorro B</label></div>
+
+      <!-- Avanzados -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 0;padding-top:18px;border-top:1px solid #F0ECE2;cursor:pointer" @click="advOpen = !advOpen"><div style="display:flex;align-items:center;gap:9px"><span style="width:8px;height:8px;border-radius:50%;background:#C2BCAF"></span><span style="font-weight:600;font-size:15px;color:#57534A">Ajustes avanzados</span></div><span style="font-size:12px;color:#A39E92"><span x-text="advOpen ? '▾' : '▸'"></span> retiro · expectativa · retornos · inflación · UF</span></div>
+      <div x-show="advOpen" x-cloak style="margin-top:18px">
+        <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Edad de retiro</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="s().retirementAge + ' años'"></span></div><input type="range" min="60" max="70" step="1" :value="s().retirementAge" @input="update('retirementAge', +$event.target.value)"></div>
+        <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A" title="Hasta qué edad esperas que dure la pensión. Define en cuántas cuotas se reparte el saldo.">Expectativa de vida</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="s().lifeExpectancy + ' años'"></span></div><input type="range" min="75" max="95" step="1" :value="s().lifeExpectancy" @input="update('lifeExpectancy', +$event.target.value)"></div>
+        <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Retorno anual AFP</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="(s().afpReturn*100).toFixed(1)+'%'"></span></div><input type="range" min="0" max="8" step="0.5" :value="s().afpReturn*100" @input="update('afpReturn', +$event.target.value/100)"></div>
+        <div style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Retorno anual APV</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="(s().apvReturn*100).toFixed(1)+'%'"></span></div><input type="range" min="0" max="9" step="0.5" :value="s().apvReturn*100" @input="update('apvReturn', +$event.target.value/100)"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+          <div><div style="font-size:12.5px;color:#8A857A;margin-bottom:6px" title="Convierte el sueldo líquido a imponible para calcular la cotización.">Factor imponible</div><input type="number" step="0.01" :value="s().taxableFactor" @change="update('taxableFactor', +$event.target.value || 1)" style="width:100%;padding:10px 12px;border:1px solid #E6E1D6;border-radius:10px;font-size:14px;background:#FBFAF6"></div>
+          <div><div style="font-size:12.5px;color:#8A857A;margin-bottom:6px" title="Sobrescribe el aporte mensual a la AFP. Déjalo vacío para usar el 10% automático.">Aporte AFP /mes (manual)</div><input type="number" placeholder="auto" :value="s().afpContributionManual ?? ''" @change="update('afpContributionManual', $event.target.value === '' ? null : +$event.target.value)" style="width:100%;padding:10px 12px;border:1px solid #E6E1D6;border-radius:10px;font-size:14px;background:#FBFAF6"></div>
+        </div>
+        <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A">Inflación anual</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="(s().inflation*100).toFixed(1)+'%'"></span></div><input type="range" min="0" max="8" step="0.5" :value="s().inflation*100" @input="update('inflation', +$event.target.value/100)"></div>
+        <div style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:13.5px;color:#57534A" title="Cuánto sube/baja el retorno en el escenario optimista/pesimista.">Ajuste de escenario ±</span><span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#2C7A6B" x-text="'± '+(s().scenarioAdjustment*100).toFixed(1)+'%'"></span></div><input type="range" min="0" max="4" step="0.5" :value="s().scenarioAdjustment*100" @input="update('scenarioAdjustment', +$event.target.value/100)"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><div style="font-size:12.5px;color:#8A857A;margin-bottom:6px" title="Unidad Tributaria Mensual. Define los topes del beneficio A.">UTM ($)</div><input type="number" :value="indicadores.utm" @change="updateInd('utm', +$event.target.value || 1)" style="width:100%;padding:10px 12px;border:1px solid #E6E1D6;border-radius:10px;font-size:14px;background:#FBFAF6"></div>
+          <div><div style="font-size:12.5px;color:#8A857A;margin-bottom:6px" title="Unidad de Fomento. Define el tope del aporte B (600 UF/año).">UF ($)</div><input type="number" :value="indicadores.uf" @change="updateInd('uf', +$event.target.value || 1)" style="width:100%;padding:10px 12px;border:1px solid #E6E1D6;border-radius:10px;font-size:14px;background:#FBFAF6"></div>
+        </div>
+        <div style="font-size:11.5px;color:#C2BCAF;margin-top:10px"><span x-show="indicators.updated" x-cloak>UF y UTM actualizadas al <span x-text="indicators.date"></span> · </span>puedes editarlos.</div>
+      </div>
+
+      <!-- actions -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;padding-top:20px;border-top:1px solid #F0ECE2">
+        <button @click="guardar()" style="flex:1;min-width:130px;background:#2C7A6B;color:#fff;border:none;border-radius:11px;padding:13px 18px;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px -4px rgba(44,122,107,0.5)">Guardar escenario</button>
+        <button @click="compartir()" style="flex:1;min-width:120px;background:#FBFAF6;color:#2C7A6B;border:1px solid #CDE0DB;border-radius:11px;padding:13px 18px;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Compartir enlace</button>
+        <button @click="reset()" style="background:#fff;color:#8A857A;border:1px solid #E6E1D6;border-radius:11px;padding:13px 18px;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:500;cursor:pointer">Restablecer</button>
+      </div>
+    </div>
+
+    <!-- footer -->
+    <div style="text-align:center;max-width:560px;margin:36px auto 0;font-size:12px;line-height:1.6;color:#A39E92">
+      Esta herramienta es una <strong style="color:#8A857A">simulación educativa</strong>; no constituye asesoría financiera ni una garantía de pensión. Los resultados dependen de supuestos (rentabilidad, inflación, expectativa de vida) que pueden diferir de la realidad.<br>
+      Para tu pensión oficial usa el <a href="https://www.spensiones.cl/apps/simuladorPensiones/" target="_blank" rel="noopener" style="color:#2C7A6B;font-weight:600">Simulador de la Superintendencia de Pensiones</a>.
+    </div>
+
+  </div>
+
+  <template x-if="toast">
+    <div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1F1D18;color:#fff;padding:12px 22px;border-radius:99px;font-size:13.5px;font-weight:500;box-shadow:0 10px 30px -8px rgba(0,0,0,0.4);z-index:50" x-text="toast"></div>
+  </template>
+</div>
 </body>
 </html>

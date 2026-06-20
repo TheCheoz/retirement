@@ -1,132 +1,161 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual, bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios, pensionEstimada, aReal } = require('../js/engine.js');
+const { monthlyRate, growYear, taxableFromNet, monthlyAfpContribution, bonusA, marginalRate, taxSavingsB, project, scenarios, estimatedPension, toReal } = require('../js/engine.js');
 
-test('tasaMensual: 12 meses compuestos reconstruyen la tasa anual', () => {
-  const m = tasaMensual(0.06);
+test('monthlyRate: 12 compounded months reconstruct the annual rate', () => {
+  const m = monthlyRate(0.06);
   assert.ok(Math.abs(Math.pow(1 + m, 12) - 1.06) < 1e-9);
 });
 
-test('crecerAnio: sin aportes, crece exactamente la tasa anual', () => {
-  const saldo = crecerAnio(1000000, 0, 0.06);
-  assert.ok(Math.abs(saldo - 1060000) < 0.01);
+test('growYear: with no contributions, grows exactly the annual rate', () => {
+  const balance = growYear(1000000, 0, 0.06);
+  assert.ok(Math.abs(balance - 1060000) < 0.01);
 });
 
-test('crecerAnio: con aporte mensual acumula 12 aportes más interés', () => {
-  const saldo = crecerAnio(0, 100000, 0); // tasa 0 => 12 aportes exactos
-  assert.equal(Math.round(saldo), 1200000);
+test('growYear: with a monthly contribution accumulates 12 contributions plus interest', () => {
+  const balance = growYear(0, 100000, 0); // rate 0 => exactly 12 contributions
+  assert.equal(Math.round(balance), 1200000);
 });
 
-test('imponibleDesdeLiquido: aplica el factor', () => {
-  assert.equal(imponibleDesdeLiquido(1000000, 1.22), 1220000);
+test('taxableFromNet: applies the factor', () => {
+  assert.equal(taxableFromNet(1000000, 1.22), 1220000);
 });
 
-test('aporteAFPMensual: 10% del imponible cuando no hay override', () => {
-  assert.equal(aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: null }), 122000);
+test('monthlyAfpContribution: 10% of taxable when there is no override', () => {
+  assert.equal(monthlyAfpContribution({ netSalary: 1000000, taxableFactor: 1.22, afpContributionManual: null }), 122000);
 });
 
-test('aporteAFPMensual: respeta el override manual', () => {
-  assert.equal(aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: 90000 }), 90000);
+test('monthlyAfpContribution: honors the manual override', () => {
+  assert.equal(monthlyAfpContribution({ netSalary: 1000000, taxableFactor: 1.22, afpContributionManual: 90000 }), 90000);
 });
 
-test('aporteAFPMensual: string vacío (campo borrado) se trata como auto, no NaN', () => {
-  const r = aporteAFPMensual({ sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: '' });
+test('monthlyAfpContribution: empty string (cleared field) is treated as auto, not NaN', () => {
+  const r = monthlyAfpContribution({ netSalary: 1000000, taxableFactor: 1.22, afpContributionManual: '' });
   assert.equal(r, 122000);
 });
 
-test('bonificacionA: 15% del aporte anual bajo el tope', () => {
-  // aporte anual 600.000 => 15% = 90.000; tope 6 UTM*67.000 = 402.000 => no aplica tope
-  assert.equal(bonificacionA(600000, 67000), 90000);
+test('bonusA: 15% of the annual contribution below the cap', () => {
+  // annual contribution 600,000 => 15% = 90,000; cap 6 UTM*67,000 = 402,000 => no cap
+  assert.equal(bonusA(600000, 67000), 90000);
 });
 
-test('bonificacionA: se corta en el tope de 6 UTM', () => {
-  // aporte anual 5.000.000 => 15% = 750.000; tope 6*67.000 = 402.000 => se corta
-  assert.equal(bonificacionA(5000000, 67000), 402000);
+test('bonusA: capped at 6 UTM', () => {
+  // annual contribution 5,000,000 => 15% = 750,000; cap 6*67,000 = 402,000 => capped
+  assert.equal(bonusA(5000000, 67000), 402000);
 });
 
-test('tasaMarginal: imponible exento (bajo 13.5 UTM) => 0%', () => {
-  // 13.5 UTM * 67.000 = 904.500; usamos 800.000 => exento
-  assert.equal(tasaMarginal(800000, 67000), 0.0);
+test('marginalRate: exempt taxable (below 13.5 UTM) => 0%', () => {
+  // 13.5 UTM * 67,000 = 904,500; we use 800,000 => exempt
+  assert.equal(marginalRate(800000, 67000), 0.0);
 });
 
-test('tasaMarginal: imponible en tramo 8%', () => {
-  // entre 30 y 50 UTM => 30*67.000=2.010.000 .. 50*67.000=3.350.000; usamos 2.500.000
-  assert.equal(tasaMarginal(2500000, 67000), 0.08);
+test('marginalRate: taxable in the 8% bracket', () => {
+  // between 30 and 50 UTM => 30*67,000=2,010,000 .. 50*67,000=3,350,000; we use 2,500,000
+  assert.equal(marginalRate(2500000, 67000), 0.08);
 });
 
-test('ahorroTributarioB: aporte * tasa marginal', () => {
-  // imponible 2.500.000 => 8%; aporte anual 600.000 => ahorro 48.000
-  assert.equal(ahorroTributarioB(600000, 2500000, 67000, 38000), 48000);
+test('taxSavingsB: contribution * marginal rate', () => {
+  // taxable 2,500,000 => 8%; annual contribution 600,000 => saving 48,000
+  assert.equal(taxSavingsB(600000, 2500000, 67000, 38000), 48000);
 });
 
-test('ahorroTributarioB: aporte se limita al tope de 600 UF anual', () => {
-  // tope = 600*38.000 = 22.800.000; aporte 30.000.000 => se usa 22.800.000
-  // imponible en 8% => ahorro = 22.800.000 * 0.08 = 1.824.000
-  assert.equal(ahorroTributarioB(30000000, 2500000, 67000, 38000), 1824000);
+test('taxSavingsB: contribution capped at the 600 UF annual cap', () => {
+  // cap = 600*38,000 = 22,800,000; contribution 30,000,000 => uses 22,800,000
+  // taxable in 8% => saving = 22,800,000 * 0.08 = 1,824,000
+  assert.equal(taxSavingsB(30000000, 2500000, 67000, 38000), 1824000);
 });
 
 const baseInputs = {
-  edadActual: 60, edadRetiro: 62, expectativaVida: 85,
-  sueldoLiquido: 1000000, factorImponible: 1.22, aporteAFPManual: null,
-  saldoAFP: 0, retornoAFP: 0,
-  apvRegimen: 'ambas', aporteAPV_A: 0, aporteAPV_B: 0, saldoAPV: 0, retornoAPV: 0,
-  apvFijo: true, reinvertirB: false,
-  saldoETF: 0, aporteETF: 0, retornoETF: 0,
-  utm: 67000, uf: 38000, inflacion: 0, crecimientoSueldo: 0, ajusteEscenario: 0,
+  currentAge: 60, retirementAge: 62, lifeExpectancy: 85,
+  netSalary: 1000000, taxableFactor: 1.22, afpContributionManual: null,
+  afpBalance: 0, afpReturn: 0,
+  apvRegime: 'both', apvContributionA: 0, apvContributionB: 0, apvBalance: 0, apvReturn: 0,
+  apvFixed: true, reinvestB: false,
+  etfBalance: 0, etfContribution: 0, etfReturn: 0,
+  utm: 67000, uf: 38000, inflation: 0, salaryGrowth: 0, scenarioAdjustment: 0,
 };
 
-test('proyectar: una fila por año desde edadActual hasta edadRetiro inclusive', () => {
-  const r = proyectar(baseInputs);
-  assert.equal(r.serie.length, 3); // 60, 61, 62
-  assert.equal(r.serie[0].edad, 60);
-  assert.equal(r.serie.at(-1).edad, 62);
+test('project: one row per year from currentAge to retirementAge inclusive', () => {
+  const r = project(baseInputs);
+  assert.equal(r.series.length, 3); // 60, 61, 62
+  assert.equal(r.series[0].age, 60);
+  assert.equal(r.series.at(-1).age, 62);
 });
 
-test('proyectar: sin retorno ni crecimiento, AFP acumula 12*aporte por año', () => {
-  const r = proyectar(baseInputs);
-  // aporte AFP = 10% * 1.220.000 = 122.000/mes => 1.464.000/año, 2 años de aportes
+test('project: with no return or growth, AFP accumulates 12*contribution per year', () => {
+  const r = project(baseInputs);
+  // AFP contribution = 10% * 1,220,000 = 122,000/mo => 1,464,000/yr, 2 years of contributions
   assert.equal(Math.round(r.total), Math.round(122000 * 12 * 2));
 });
 
-test('proyectar: crecimiento de sueldo sube el aporte AFP del año 2', () => {
-  const r = proyectar({ ...baseInputs, crecimientoSueldo: 0.10 });
-  // año1 aporte 122.000, año2 aporte 134.200 => total = (122000+134200)*12
+test('project: salary growth raises the AFP contribution in year 2', () => {
+  const r = project({ ...baseInputs, salaryGrowth: 0.10 });
+  // year1 contribution 122,000, year2 contribution 134,200 => total = (122000+134200)*12
   assert.equal(Math.round(r.total), Math.round((122000 + 134200) * 12));
 });
 
-test('escenarios: realista usa el retorno base', () => {
-  const r = escenarios({ ...baseInputs, retornoAFP: 0.04, ajusteEscenario: 0.02 });
-  const directo = proyectar({ ...baseInputs, retornoAFP: 0.04 });
-  assert.equal(Math.round(r.realista.total), Math.round(directo.total));
+test('project: pensionBalance excludes the ETF (AFP + APV only)', () => {
+  const r = project({ ...baseInputs, etfBalance: 9000000, etfContribution: 100000 });
+  // ETF must not inflate the pension fund; pensionBalance stays AFP+APV.
+  assert.equal(Math.round(r.pensionBalance), Math.round(122000 * 12 * 2));
+  assert.ok(r.total > r.pensionBalance); // total still includes the ETF
 });
 
-test('escenarios: optimista > realista > pesimista cuando hay aportes y retorno', () => {
-  const r = escenarios({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05, ajusteEscenario: 0.02 });
-  assert.ok(r.optimista.total > r.realista.total);
-  assert.ok(r.realista.total > r.pesimista.total);
+test('project: apvStartAge delays APV contributions (less than starting now)', () => {
+  const apvIn = {
+    ...baseInputs, currentAge: 30, retirementAge: 65,
+    apvRegime: 'A', apvContributionA: 50000, apvReturn: 0.04,
+  };
+  const now = project(apvIn);                          // APV from age 30
+  const delayed = project({ ...apvIn, apvStartAge: 35 }); // APV from age 35
+  assert.ok(delayed.pensionBalance < now.pensionBalance);
+  assert.ok(delayed.accumulatedBonusA < now.accumulatedBonusA);
 });
 
-test('escenarios: el ajuste aplicado es ±ajusteEscenario', () => {
-  const r = escenarios({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05, ajusteEscenario: 0.02 });
-  const opt = proyectar({ ...baseInputs, saldoAFP: 10000000, retornoAFP: 0.05 }, 0.02);
-  assert.equal(Math.round(r.optimista.total), Math.round(opt.total));
+test('project: apvStartAge >= retirementAge => no APV contributed at all', () => {
+  const apvIn = {
+    ...baseInputs, currentAge: 30, retirementAge: 65,
+    apvRegime: 'A', apvContributionA: 50000, apvReturn: 0.04, apvBalance: 0,
+  };
+  const none = project({ ...apvIn, apvStartAge: 65 });
+  const noApv = project({ ...apvIn, apvContributionA: 0 });
+  assert.equal(Math.round(none.pensionBalance), Math.round(noApv.pensionBalance));
+  assert.equal(none.accumulatedBonusA, 0);
 });
 
-test('pensionEstimada: saldo dividido por meses esperados', () => {
-  // saldo 120.000.000; (85-65)*12 = 240 meses => 500.000
-  assert.equal(pensionEstimada(120000000, 65, 85), 500000);
+test('scenarios: realistic uses the base return', () => {
+  const r = scenarios({ ...baseInputs, afpReturn: 0.04, scenarioAdjustment: 0.02 });
+  const direct = project({ ...baseInputs, afpReturn: 0.04 });
+  assert.equal(Math.round(r.realistic.total), Math.round(direct.total));
 });
 
-test('pensionEstimada: 0 meses esperados => 0 (sin división por cero)', () => {
-  assert.equal(pensionEstimada(120000000, 85, 85), 0);
+test('scenarios: optimistic > realistic > pessimistic with contributions and return', () => {
+  const r = scenarios({ ...baseInputs, afpBalance: 10000000, afpReturn: 0.05, scenarioAdjustment: 0.02 });
+  assert.ok(r.optimistic.total > r.realistic.total);
+  assert.ok(r.realistic.total > r.pessimistic.total);
 });
 
-test('aReal: descuenta inflación según años desde hoy', () => {
-  const serie = [
-    { edad: 30, total: 1000000 },
-    { edad: 31, total: 1000000 },
+test('scenarios: the applied adjustment is ±scenarioAdjustment', () => {
+  const r = scenarios({ ...baseInputs, afpBalance: 10000000, afpReturn: 0.05, scenarioAdjustment: 0.02 });
+  const opt = project({ ...baseInputs, afpBalance: 10000000, afpReturn: 0.05 }, 0.02);
+  assert.equal(Math.round(r.optimistic.total), Math.round(opt.total));
+});
+
+test('estimatedPension: balance / expected months, net of 7% health', () => {
+  // balance 120,000,000; (85-65)*12 = 240 months => 500,000 gross; 465,000 net
+  assert.equal(Math.round(estimatedPension(120000000, 65, 85)), 465000);
+});
+
+test('estimatedPension: 0 expected months => 0 (no division by zero)', () => {
+  assert.equal(estimatedPension(120000000, 85, 85), 0);
+});
+
+test('toReal: discounts inflation by years from today', () => {
+  const series = [
+    { age: 30, total: 1000000 },
+    { age: 31, total: 1000000 },
   ];
-  const r = aReal(serie, 0.10, 30);
-  assert.equal(Math.round(r[0].total), 1000000);          // año 0
-  assert.equal(Math.round(r[1].total), Math.round(1000000 / 1.1)); // año 1
+  const r = toReal(series, 0.10, 30);
+  assert.equal(Math.round(r[0].total), 1000000);          // year 0
+  assert.equal(Math.round(r[1].total), Math.round(1000000 / 1.1)); // year 1
 });

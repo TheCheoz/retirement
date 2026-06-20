@@ -1,20 +1,20 @@
-// persistence.js — UMD: <script> clásico en el navegador (define
-// window.RetiroPersistence) y módulo CommonJS en Node.
+// persistence.js — UMD: classic <script> in the browser (defines
+// window.RetirementPersistence) and a CommonJS module in Node.
 (function (root, factory) {
   const api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else root.RetiroPersistence = api;
+  else root.RetirementPersistence = api;
 })(typeof self !== 'undefined' ? self : this, function () {
-  const KEY_STATE = 'retiro:estado';
-  const KEY_SCENARIOS = 'retiro:escenarios';
+  const KEY_STATE = 'retirement:state';
+  const KEY_SCENARIOS = 'retirement:scenarios';
 
-  // --- Serialización para URL (funciones puras, testeables sin navegador) ---
+  // --- URL serialization (pure functions, testable without a browser) ---
 
-  // Codifica inputs a base64 (compatible navegador y Node).
+  // Encodes inputs to base64 (works in both browser and Node).
   function encodeState(inputs) {
     const json = JSON.stringify(inputs);
     if (typeof btoa === 'function') {
-      // Idioma moderno unicode-safe (sin escape/unescape deprecados).
+      // Modern unicode-safe idiom (no deprecated escape/unescape).
       const bytes = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
       return btoa(bytes);
     }
@@ -37,28 +37,43 @@
     }
   }
 
-  // --- localStorage (sólo navegador; no-ops si no existe) ---
+  // --- localStorage (browser only; no-ops if unavailable) ---
+
+  // Firefox throws SecurityError just *touching* localStorage on file://, so a
+  // `typeof localStorage` guard isn't enough — every access must be wrapped.
+  function storage() {
+    try { return typeof localStorage !== 'undefined' ? localStorage : null; }
+    catch { return null; }
+  }
 
   function saveState(inputs) {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(KEY_STATE, JSON.stringify(inputs));
+    const ls = storage();
+    if (!ls) return;
+    try { ls.setItem(KEY_STATE, JSON.stringify(inputs)); } catch {}
   }
 
   function loadState() {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(KEY_STATE);
-    return raw ? JSON.parse(raw) : null;
+    const ls = storage();
+    if (!ls) return null;
+    try {
+      const raw = ls.getItem(KEY_STATE);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
   }
 
   function saveScenarios(list) {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(KEY_SCENARIOS, JSON.stringify(list));
+    const ls = storage();
+    if (!ls) return;
+    try { ls.setItem(KEY_SCENARIOS, JSON.stringify(list)); } catch {}
   }
 
   function loadScenarios() {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(KEY_SCENARIOS);
-    return raw ? JSON.parse(raw) : [];
+    const ls = storage();
+    if (!ls) return [];
+    try {
+      const raw = ls.getItem(KEY_SCENARIOS);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
   }
 
   // --- URL hash ---

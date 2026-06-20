@@ -1,163 +1,172 @@
-// engine.js — UMD: <script> clásico en el navegador (define window.RetiroEngine)
-// y módulo CommonJS en Node. Depende de constants.
+// engine.js — UMD: classic <script> in the browser (defines window.RetirementEngine)
+// and a CommonJS module in Node. Depends on constants.
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory(require('./constants.js'));
   } else {
-    root.RetiroEngine = factory(root.RetiroConstants);
+    root.RetirementEngine = factory(root.RetirementConstants);
   }
 })(typeof self !== 'undefined' ? self : this, function (C) {
   const {
-    COTIZACION_OBLIGATORIA, BONIFICACION_A_PCT, BONIFICACION_A_TOPE_UTM,
-    TRAMOS_IMPUESTO, APV_TOPE_UF_ANUAL,
+    MANDATORY_CONTRIBUTION, HEALTH_CONTRIBUTION, BONUS_A_PCT, BONUS_A_CAP_UTM,
+    TAX_BRACKETS, APV_CAP_UF_ANNUAL,
   } = C;
 
-  // Tasa mensual equivalente a una tasa anual compuesta.
-  function tasaMensual(tasaAnual) {
-    return Math.pow(1 + tasaAnual, 1 / 12) - 1;
+  // Monthly rate equivalent to a compounded annual rate.
+  function monthlyRate(annualRate) {
+    return Math.pow(1 + annualRate, 1 / 12) - 1;
   }
 
-  // Hace crecer un saldo durante un año, sumando `aporteMensual` cada mes
-  // y capitalizando mensualmente a `tasaAnual`.
-  function crecerAnio(saldoInicial, aporteMensual, tasaAnual) {
-    const m = tasaMensual(tasaAnual);
-    let saldo = saldoInicial;
+  // Grows a balance over one year, adding `monthlyContribution` each month
+  // and compounding monthly at `annualRate`.
+  function growYear(initialBalance, monthlyContribution, annualRate) {
+    const m = monthlyRate(annualRate);
+    let balance = initialBalance;
     for (let i = 0; i < 12; i++) {
-      saldo = saldo * (1 + m) + aporteMensual;
+      balance = balance * (1 + m) + monthlyContribution;
     }
-    return saldo;
+    return balance;
   }
 
-  // Calcula el sueldo imponible multiplicando el sueldo líquido por el factor imponible.
-  function imponibleDesdeLiquido(sueldoLiquido, factorImponible) {
-    return sueldoLiquido * factorImponible;
+  // Taxable salary = net salary times the taxable factor.
+  function taxableFromNet(netSalary, taxableFactor) {
+    return netSalary * taxableFactor;
   }
 
-  // Aporte obligatorio mensual a la AFP. Si hay override manual, se usa tal cual.
-  function aporteAFPMensual({ sueldoLiquido, factorImponible, aporteAFPManual }) {
-    // Trata null y string vacío (campo borrado en la UI) como "auto" para no propagar NaN.
-    if (aporteAFPManual != null && aporteAFPManual !== '') return aporteAFPManual;
-    return imponibleDesdeLiquido(sueldoLiquido, factorImponible) * COTIZACION_OBLIGATORIA;
+  // Monthly mandatory AFP contribution. A manual override is used as-is.
+  function monthlyAfpContribution({ netSalary, taxableFactor, afpContributionManual }) {
+    // Treat null and empty string (a cleared UI field) as "auto" to avoid propagating NaN.
+    if (afpContributionManual != null && afpContributionManual !== '') return afpContributionManual;
+    return taxableFromNet(netSalary, taxableFactor) * MANDATORY_CONTRIBUTION;
   }
 
-  // Bonificación estatal anual del Régimen A: 15% del aporte, tope 6 UTM/año.
-  function bonificacionA(aporteAnualA, utm) {
-    return Math.min(BONIFICACION_A_PCT * aporteAnualA, BONIFICACION_A_TOPE_UTM * utm);
+  // Régimen A annual state bonus: 15% of the contribution, capped at 6 UTM/year.
+  function bonusA(annualContributionA, utm) {
+    return Math.min(BONUS_A_PCT * annualContributionA, BONUS_A_CAP_UTM * utm);
   }
 
-  // Tasa marginal del Impuesto Único de 2ª Categoría según el imponible mensual.
-  function tasaMarginal(imponibleMensual, utm) {
-    const enUTM = imponibleMensual / utm;
-    for (const t of TRAMOS_IMPUESTO) {
-      if (enUTM > t.desde && enUTM <= t.hasta) return t.factor;
+  // Marginal rate of the second-category income tax from the monthly taxable income.
+  function marginalRate(monthlyTaxable, utm) {
+    const inUTM = monthlyTaxable / utm;
+    for (const b of TAX_BRACKETS) {
+      if (inUTM > b.from && inUTM <= b.to) return b.rate;
     }
     return 0;
   }
 
-  // Ahorro tributario anual del Régimen B: aporte (topado a 600 UF) * tasa marginal.
-  function ahorroTributarioB(aporteAnualB, imponibleMensual, utm, uf) {
-    const topeAnual = APV_TOPE_UF_ANUAL * uf;
-    const base = Math.min(aporteAnualB, topeAnual);
-    return base * tasaMarginal(imponibleMensual, utm);
+  // Régimen B annual tax saving: contribution (capped at 600 UF) * marginal rate.
+  function taxSavingsB(annualContributionB, monthlyTaxable, utm, uf) {
+    const annualCap = APV_CAP_UF_ANNUAL * uf;
+    const base = Math.min(annualContributionB, annualCap);
+    return base * marginalRate(monthlyTaxable, utm);
   }
 
-  // Proyecta el ahorro año a año desde edadActual hasta edadRetiro (inclusive).
-  // `ajuste` desplaza el retorno anual de TODAS las categorías (para escenarios).
-  // Devuelve { serie:[{edad, saldoAFP, saldoAPV, saldoETF, total}], total,
-  //            bonoAcumuladoA, ahorroAcumuladoB }.
-  function proyectar(inputs, ajuste = 0) {
-    const anios = inputs.edadRetiro - inputs.edadActual;
-    let saldoAFP = inputs.saldoAFP;
-    let saldoAPV = inputs.saldoAPV;
-    let saldoETF = inputs.saldoETF;
-    let bonoAcumuladoA = 0;
-    let ahorroAcumuladoB = 0;
+  // Projects savings year by year from currentAge to retirementAge (inclusive).
+  // `adjustment` shifts the annual return of EVERY category (for scenarios).
+  // Returns { series:[{age, afpBalance, apvBalance, etfBalance, total}], total,
+  //           accumulatedBonusA, accumulatedSavingsB }.
+  function project(inputs, adjustment = 0) {
+    const years = inputs.retirementAge - inputs.currentAge;
+    let afpBalance = inputs.afpBalance;
+    let apvBalance = inputs.apvBalance;
+    let etfBalance = inputs.etfBalance;
+    let accumulatedBonusA = 0;
+    let accumulatedSavingsB = 0;
 
-    let sueldoLiquido = inputs.sueldoLiquido;
-    let aporteA = inputs.aporteAPV_A;
-    let aporteB = inputs.aporteAPV_B;
+    let netSalary = inputs.netSalary;
+    let contributionA = inputs.apvContributionA;
+    let contributionB = inputs.apvContributionB;
 
-    const usaA = inputs.apvRegimen === 'A' || inputs.apvRegimen === 'ambas';
-    const usaB = inputs.apvRegimen === 'B' || inputs.apvRegimen === 'ambas';
+    const usesA = inputs.apvRegime === 'A' || inputs.apvRegime === 'both';
+    const usesB = inputs.apvRegime === 'B' || inputs.apvRegime === 'both';
 
-    const serie = [{
-      edad: inputs.edadActual,
-      saldoAFP, saldoAPV, saldoETF, total: saldoAFP + saldoAPV + saldoETF,
+    const series = [{
+      age: inputs.currentAge,
+      afpBalance, apvBalance, etfBalance, total: afpBalance + apvBalance + etfBalance,
     }];
 
-    for (let i = 0; i < anios; i++) {
-      const factorImp = inputs.factorImponible;
-      const imponibleMensual = imponibleDesdeLiquido(sueldoLiquido, factorImp);
-      const aporteAFP = aporteAFPMensual({ sueldoLiquido, factorImponible: factorImp, aporteAFPManual: inputs.aporteAFPManual });
+    for (let i = 0; i < years; i++) {
+      const factor = inputs.taxableFactor;
+      const monthlyTaxable = taxableFromNet(netSalary, factor);
+      const afpContribution = monthlyAfpContribution({ netSalary, taxableFactor: factor, afpContributionManual: inputs.afpContributionManual });
 
-      const apvA = usaA ? aporteA : 0;
-      const apvB = usaB ? aporteB : 0;
+      // APV contributions can start later than currentAge (apvStartAge): until that
+      // age only the existing APV balance compounds. Null/undefined => start now.
+      const apvActive = inputs.apvStartAge == null || (inputs.currentAge + i) >= inputs.apvStartAge;
+      const apvA = (usesA && apvActive) ? contributionA : 0;
+      const apvB = (usesB && apvActive) ? contributionB : 0;
 
-      saldoAFP = crecerAnio(saldoAFP, aporteAFP, inputs.retornoAFP + ajuste);
-      saldoAPV = crecerAnio(saldoAPV, apvA + apvB, inputs.retornoAPV + ajuste);
-      saldoETF = crecerAnio(saldoETF, inputs.aporteETF, inputs.retornoETF + ajuste);
+      afpBalance = growYear(afpBalance, afpContribution, inputs.afpReturn + adjustment);
+      apvBalance = growYear(apvBalance, apvA + apvB, inputs.apvReturn + adjustment);
+      etfBalance = growYear(etfBalance, inputs.etfContribution, inputs.etfReturn + adjustment);
 
-      // Beneficios anuales del APV
-      if (usaA) {
-        const bono = bonificacionA(apvA * 12, inputs.utm);
-        bonoAcumuladoA += bono;
-        saldoAPV += bono; // el bono A se deposita en el fondo
+      // Annual APV benefits
+      if (usesA && apvActive) {
+        const bonus = bonusA(apvA * 12, inputs.utm);
+        accumulatedBonusA += bonus;
+        apvBalance += bonus; // the A bonus is deposited into the fund
       }
-      if (usaB) {
-        const ahorro = ahorroTributarioB(apvB * 12, imponibleMensual, inputs.utm, inputs.uf);
-        ahorroAcumuladoB += ahorro;
-        if (inputs.reinvertirB) saldoAPV += ahorro;
+      if (usesB && apvActive) {
+        const saving = taxSavingsB(apvB * 12, monthlyTaxable, inputs.utm, inputs.uf);
+        accumulatedSavingsB += saving;
+        if (inputs.reinvestB) apvBalance += saving;
       }
 
-      serie.push({
-        edad: inputs.edadActual + i + 1,
-        saldoAFP, saldoAPV, saldoETF, total: saldoAFP + saldoAPV + saldoETF,
+      series.push({
+        age: inputs.currentAge + i + 1,
+        afpBalance, apvBalance, etfBalance, total: afpBalance + apvBalance + etfBalance,
       });
 
-      // Crecimiento anual para el próximo año
-      sueldoLiquido *= (1 + inputs.crecimientoSueldo);
-      if (!inputs.apvFijo) {
-        aporteA *= (1 + inputs.crecimientoSueldo);
-        aporteB *= (1 + inputs.crecimientoSueldo);
+      // Annual growth for next year
+      netSalary *= (1 + inputs.salaryGrowth);
+      if (!inputs.apvFixed) {
+        contributionA *= (1 + inputs.salaryGrowth);
+        contributionB *= (1 + inputs.salaryGrowth);
       }
     }
 
     return {
-      serie,
-      total: serie.at(-1).total,
-      bonoAcumuladoA,
-      ahorroAcumuladoB,
+      series,
+      total: series.at(-1).total,
+      // Pension is funded only by the pension savings (AFP + APV); the ETF is for
+      // personal goals, not retirement, so it's excluded from the pension estimate.
+      pensionBalance: afpBalance + apvBalance,
+      accumulatedBonusA,
+      accumulatedSavingsB,
     };
   }
 
-  // Devuelve las 3 proyecciones aplicando ∓ajusteEscenario al retorno.
-  function escenarios(inputs) {
-    const d = inputs.ajusteEscenario;
+  // Returns the 3 projections applying ∓scenarioAdjustment to the return.
+  function scenarios(inputs) {
+    const d = inputs.scenarioAdjustment;
     return {
-      pesimista: proyectar(inputs, -d),
-      realista: proyectar(inputs, 0),
-      optimista: proyectar(inputs, +d),
+      pessimistic: project(inputs, -d),
+      realistic: project(inputs, 0),
+      optimistic: project(inputs, +d),
     };
   }
 
-  // Pensión mensual estimada (retiro programado simplificado): saldo / meses esperados.
-  function pensionEstimada(saldoFinal, edadRetiro, expectativaVida) {
-    const meses = (expectativaVida - edadRetiro) * 12;
-    if (meses <= 0) return 0;
-    return saldoFinal / meses;
+  // Estimated monthly pension as a programmed withdrawal (Retiro Programado): the
+  // initial monthly amount, balance / expected months, net of the 7% health levy.
+  // This is the *initial* draw of a programmed withdrawal, not a fixed annuity
+  // (Renta Vitalicia) — it runs higher than an annuity by design.
+  function estimatedPension(finalBalance, retirementAge, lifeExpectancy) {
+    const months = (lifeExpectancy - retirementAge) * 12;
+    if (months <= 0) return 0;
+    return (finalBalance / months) * (1 - HEALTH_CONTRIBUTION);
   }
 
-  // Convierte una serie nominal a pesos de hoy descontando inflación.
-  function aReal(serie, inflacion, edadActual) {
-    return serie.map((p) => ({
+  // Converts a nominal series to today's pesos by discounting inflation.
+  function toReal(series, inflation, currentAge) {
+    return series.map((p) => ({
       ...p,
-      total: p.total / Math.pow(1 + inflacion, p.edad - edadActual),
+      total: p.total / Math.pow(1 + inflation, p.age - currentAge),
     }));
   }
 
   return {
-    tasaMensual, crecerAnio, imponibleDesdeLiquido, aporteAFPMensual,
-    bonificacionA, tasaMarginal, ahorroTributarioB, proyectar, escenarios,
-    pensionEstimada, aReal,
+    monthlyRate, growYear, taxableFromNet, monthlyAfpContribution,
+    bonusA, marginalRate, taxSavingsB, project, scenarios,
+    estimatedPension, toReal,
   };
 });
