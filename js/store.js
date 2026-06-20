@@ -209,6 +209,27 @@
         this.view = this.renderVals();
       },
 
+      // Nearest hover column to a pointer x (mouse or touch), in client coords.
+      nearestCol(el, clientX) {
+        const cols = this.view.hoverCols || [];
+        if (!cols.length) return null;
+        const r = el.getBoundingClientRect();
+        const vx = (clientX - r.left) / r.width * 1000;
+        let bi = 0;
+        for (let i = 1; i < cols.length; i++) if (Math.abs(cols[i].x - vx) < Math.abs(cols[bi].x - vx)) bi = i;
+        return bi;
+      },
+
+      // Overlay markup (guide line + dots) for the hovered chart column.
+      // Built as a string because <template> can't run inside <svg>.
+      hoverSvg(hi) {
+        const col = this.view.hoverCols && this.view.hoverCols[hi];
+        if (!col) return '';
+        let s = `<line x1="${col.x}" x2="${col.x}" y1="${Y0 - 2}" y2="${Y1}" stroke="#C2BCAF" stroke-width="1" stroke-dasharray="4 4"/>`;
+        col.pts.forEach((p) => { s += `<circle cx="${col.x}" cy="${p.cy}" r="4.5" fill="${p.color}" stroke="#fff" stroke-width="2"/>`; });
+        return s;
+      },
+
       // All template-bound derived data, computed from engine projections.
       renderVals() {
         const real = this.verReal;
@@ -244,13 +265,13 @@
           return {
             key: k, name: this.scenarioName(k),
             pension: fmt(deflateFor(scn, penOf(allEsp[k], scn), null)),
-            style: `display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:11px 16px;border-radius:13px;cursor:pointer;transition:all .15s;background:${on ? '#fff' : '#FBF8F1'};border:1.5px solid ${on ? '#2C7A6B' : '#E6E1D6'};box-shadow:${on ? '0 6px 16px -8px rgba(44,122,107,0.45)' : 'none'};font-family:'Hanken Grotesk',sans-serif`,
-            labelColor: `white-space:nowrap;color:${on ? '#2C7A6B' : '#8A857A'}`,
-            valueColor: `white-space:nowrap;color:${on ? '#1F1D18' : '#57534A'}`,
+            style: `flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:10px 24px;border-radius:24px;cursor:pointer;border:none;transition:all .15s;font-family:'Inter',sans-serif;background:${on ? '#fff' : 'transparent'};box-shadow:${on ? '0 4px 12px -6px rgba(31,29,24,0.28)' : 'none'}`,
+            labelColor: `white-space:nowrap;color:${on ? '#1F1D18' : '#57534A'}`,
+            valueColor: `white-space:nowrap;color:${on ? '#2C7A6B' : '#A39E92'}`,
           };
         });
         const cm = this.comparar;
-        const compararStyle = `display:flex;align-items:center;padding:11px 18px;border-radius:13px;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:13.5px;font-weight:600;transition:all .15s;background:${cm ? '#2C7A6B' : '#FBF8F1'};color:${cm ? '#fff' : '#57534A'};border:1.5px solid ${cm ? '#2C7A6B' : '#E6E1D6'}`;
+        const compararStyle = `display:flex;align-items:center;gap:7px;margin-left:4px;padding:10px 20px;border-radius:24px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;transition:all .15s;border:1px solid ${cm ? '#2C7A6B' : '#E0D9C9'};background:${cm ? '#2C7A6B' : '#F3EFE6'};color:${cm ? '#fff' : '#57534A'}`;
 
         // ---- chart geometry ----
         let datasets, minAge, maxAge;
@@ -314,6 +335,20 @@
         if (showDot) svg.push(`<circle cx="${dotX}" cy="${dotY}" r="6.5" fill="#2C7A6B" stroke="#fff" stroke-width="2.5"/>`);
         const svgInner = svg.join('');
 
+        // ---- hover columns: x + per-series y/value at each sampled age ----
+        const dsLabels = cm ? KEYS.map((k) => this.scenarioName(k)) : ['Pesimista', 'Optimista', 'Esperado'];
+        const refSeries = datasets.reduce((a, d) => (d.series.length > a.length ? d.series : a), datasets[0].series);
+        const hoverCols = refSeries.map((rp) => {
+          const age = rp.age;
+          const pts = datasets.map((d, i) => {
+            let best = d.series[0];
+            for (const p of d.series) if (Math.abs(p.age - age) < Math.abs(best.age - age)) best = p;
+            const v = deflateFor(d.scn, best.total, best.age);
+            return { color: d.color, cy: +mapY(v).toFixed(1), amount: fmt(v), label: dsLabels[i] };
+          });
+          return { x: +mapX(age).toFixed(1), age, pts };
+        });
+
         // ---- stats / compare ----
         const stats = [
           { label: 'Saldo final (esperado)', val: fmt(deflate(esp.total, active.retirementAge)) },
@@ -325,12 +360,14 @@
         const compareRows = KEYS.map((k) => {
           const scn = this._inputs(k);
           const best = allPen[k] === bestVal;
+          // Full row style in one binding: Alpine's :style replaces the static
+          // style attribute (wiping display:grid), so everything lives here.
           return {
-            name: this.scenarioName(k), color: COLS[k],
+            name: this.scenarioName(k), color: COLS[k], best,
             pension: fmt(deflateFor(scn, allPen[k], null)),
             saldo: fmt(deflateFor(scn, allEsp[k].total, scn.retirementAge)),
-            bg: best ? '#E9F2EF' : '#fff',
-            badge: best ? 'display:inline-block;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#2C7A6B;background:#D6EAE4;padding:2px 7px;border-radius:99px' : 'display:none',
+            rowStyle: `display:grid;grid-template-columns:1.5fr 1fr 1fr;align-items:center;padding:15px 16px;border-radius:14px;margin-bottom:2px;background:${best ? '#E9F2EF' : 'transparent'};box-shadow:${best ? 'inset 3px 0 0 #2C7A6B' : 'none'}`,
+            pensionStyle: `text-align:right;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:19px;color:${best ? '#2C7A6B' : '#1F1D18'}`,
           };
         });
 
@@ -339,7 +376,7 @@
           chips, compararStyle,
           chartTitle: cm ? 'Acumulación comparada (esperado)' : 'Cómo crece tu ahorro',
           chartUnit: real ? 'pesos de hoy' : 'pesos nominales',
-          svgInner, legend,
+          svgInner, legend, hoverCols,
           stats, compareRows,
           activeName: this.scenarioName(this.active),
           activeHasApv: DEFS[this.active].apv,
