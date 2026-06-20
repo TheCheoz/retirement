@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Tests — Motor del Simulador</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; background:#0d1117; color:#cdd; }
+    .ok { color:#4ade80; } .fail { color:#f87171; }
+    pre { background:#161b22; padding:1rem; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <h1>Tests del motor (navegador)</h1>
+  <pre id="out"></pre>
+  <!-- Scripts clásicos: funcionan también abriendo el archivo con doble clic. -->
+  <script src="js/constants.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/persistence.js"></script>
+  <script>
+    const { bonusA, scenarios, estimatedPension, project } = window.RetirementEngine;
+    const { encodeState, decodeState } = window.RetirementPersistence;
+
+    const out = document.getElementById('out');
+    let pass = 0, fail = 0;
+    function check(name, cond) {
+      const line = (cond ? '✓ ' : '✗ ') + name;
+      out.innerHTML += `<span class="${cond ? 'ok' : 'fail'}">${line}</span>\n`;
+      cond ? pass++ : fail++;
+    }
+
+    check('bonusA respects the 6 UTM cap', bonusA(5000000, 67000) === 402000);
+    check('estimatedPension balance/months net of 7% health', Math.round(estimatedPension(120000000, 65, 85)) === 465000);
+    check('encode/decode round-trip', (() => {
+      const o = { a: 1, b: 'x' }; return JSON.stringify(decodeState(encodeState(o))) === JSON.stringify(o);
+    })());
+    const e = scenarios({
+      currentAge: 30, retirementAge: 65, lifeExpectancy: 85, netSalary: 1000000,
+      taxableFactor: 1.22, afpContributionManual: null, afpBalance: 10000000, afpReturn: 0.05,
+      apvRegime: 'both', apvContributionA: 50000, apvContributionB: 50000, apvBalance: 2000000,
+      apvReturn: 0.04, apvFixed: false, reinvestB: false, etfBalance: 0, etfContribution: 0,
+      etfReturn: 0.06, utm: 67000, uf: 38000, inflation: 0.03, salaryGrowth: 0.02,
+      scenarioAdjustment: 0.02,
+    });
+    check('optimistic > realistic > pessimistic', e.optimistic.total > e.realistic.total && e.realistic.total > e.pessimistic.total);
+    check('apvStartAge delays APV (less than starting now)', (() => {
+      const base = { currentAge: 30, retirementAge: 65, lifeExpectancy: 85, netSalary: 1000000,
+        taxableFactor: 1.22, afpContributionManual: null, afpBalance: 0, afpReturn: 0,
+        apvRegime: 'A', apvContributionA: 50000, apvContributionB: 0, apvBalance: 0, apvReturn: 0.04,
+        apvFixed: true, reinvestB: false, etfBalance: 0, etfContribution: 0, etfReturn: 0,
+        utm: 67000, uf: 38000, inflation: 0, salaryGrowth: 0, scenarioAdjustment: 0 };
+      return project({ ...base, apvStartAge: 35 }).pensionBalance < project(base).pensionBalance;
+    })());
+
+    out.innerHTML += `\n${fail === 0 ? '<span class="ok">TODOS PASARON</span>' : '<span class="fail">HAY FALLOS</span>'} (${pass} ok, ${fail} fail)\n`;
+  </script>
+</body>
+</html>
