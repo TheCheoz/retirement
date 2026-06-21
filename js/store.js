@@ -185,6 +185,33 @@
         }[this.wiz.goalType] || '';
       },
 
+      // Recap rows for the step-4 summary, built from the wizard answers.
+      wizardSummary() {
+        const d = E.defaultsForSex(this.base.sex);
+        let goal;
+        if (this.wiz.goalType === 'ideal') goal = 'Pensión ideal de ' + fmt(+this.wiz.idealPension || 0) + '/mes';
+        else if (this.wiz.goalType === 'lifestyle') goal = 'Cubrir un gasto de ' + fmt(+this.wiz.lifestyleSpending || 0) + '/mes';
+        else goal = 'Conocer mi pensión estimada';
+        const afp = (this.wiz.afpManual != null && this.wiz.afpManual !== '') ? +this.wiz.afpManual : this.wiz.afpEstimated;
+        return [
+          { label: 'Perfil', value: this.base.currentAge + ' años · ' + (this.base.sex === 'female' ? 'Mujer' : 'Hombre') },
+          { label: 'Jubilación / expectativa', value: d.retirementAge + ' / ' + d.lifeExpectancy + ' años' },
+          { label: 'Objetivo', value: goal },
+          { label: 'Renta líquida', value: fmt(this.base.netSalary) + '/mes' },
+          { label: 'Saldo AFP actual', value: fmt(afp || 0) },
+        ];
+      },
+
+      // A concrete illustration of inflation between now and retirement.
+      inflationNote() {
+        const d = E.defaultsForSex(this.base.sex);
+        const years = d.retirementAge - this.base.currentAge;
+        const factor = Math.pow(1 + this.base.inflation, years);
+        const pct = (this.base.inflation * 100).toFixed(1).replace('.0', '');
+        return 'En unos ' + years + ' años, con una inflación de ' + pct + '% anual, algo que hoy cuesta '
+          + fmt(100000) + ' costará cerca de ' + fmt(100000 * factor) + '.';
+      },
+
       nextStep() { this.wizardStep++; },
       prevStep() { if (this.wizardStep > 1) this.wizardStep--; },
 
@@ -250,11 +277,10 @@
 
       fmt,
 
-      // Pill style for the nominal/inflation segmented toggle.
+      // Compact pill style for the nominal/inflation segmented toggle (chart header).
       segStyle(active) {
-        return 'padding:9px 18px;border:none;border-radius:99px;cursor:pointer;font-family:Inter,sans-serif;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s;background:'
-          + (active ? '#2C7A6B' : 'transparent') + ';color:' + (active ? '#fff' : '#57534A')
-          + ';box-shadow:' + (active ? '0 2px 8px -2px rgba(44,122,107,0.5)' : 'none');
+        return 'padding:6px 13px;border:none;border-radius:99px;cursor:pointer;font-family:Inter,sans-serif;font-size:12px;font-weight:600;white-space:nowrap;transition:all .15s;background:'
+          + (active ? '#2C7A6B' : 'transparent') + ';color:' + (active ? '#fff' : '#8A857A');
       },
 
       // Engine input for a scenario key: shared base + UF/UTM, with the APV

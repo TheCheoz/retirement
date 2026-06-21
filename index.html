@@ -42,8 +42,11 @@
     /* On phones, pin the scenario chips to the bottom as a floating bar. */
     @media(max-width:560px){
       .chips-bar{position:fixed;left:0;right:0;bottom:0;z-index:30;margin-bottom:0!important;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(251,248,241,0.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-top:1px solid #E9E3D7}
-      .chips-bar > div{width:100%;max-width:520px}
-      body{padding-bottom:150px}
+      .chips-bar > div{width:100%;max-width:520px;flex-wrap:wrap;row-gap:6px}
+      /* keep the 3 scenario chips shrinkable so they fit one row, and drop "Comparar" to its own full-width row */
+      .chips-bar > div > button{min-width:0!important;flex:1 1 0!important}
+      .chips-bar > div > button.comparar-btn{flex:1 1 100%!important;margin-left:0!important;justify-content:center!important}
+      body{padding-bottom:170px}
     }
   </style>
   <!-- App logic: classic scripts (load from file://, no CORS).
@@ -129,10 +132,21 @@
         </div>
       </div>
 
-      <!-- Step 4: confirm -->
+      <!-- Step 4: summary + inflation note -->
       <div x-show="wizardStep===4">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:26px;margin-bottom:14px;letter-spacing:-0.01em">¡Listo!</div>
-        <div style="font-size:14px;line-height:1.55;color:#57534A">Con esto proyectamos tu pensión y te mostramos cuánto necesitas ahorrar para llegar a tu objetivo. Podrás ajustar todos los detalles después.</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:26px;margin-bottom:18px;letter-spacing:-0.01em">Revisa tu resumen</div>
+        <div style="background:#FBF8F1;border:1px solid #EFEAE0;border-radius:14px;padding:4px 16px;margin-bottom:18px">
+          <template x-for="(row, i) in wizardSummary()" :key="i">
+            <div :style="'display:flex;justify-content:space-between;gap:14px;padding:12px 0;font-size:13.5px;'+(i < wizardSummary().length-1 ? 'border-bottom:1px solid #EFEAE0' : '')">
+              <span style="color:#8A857A;white-space:nowrap" x-text="row.label"></span>
+              <span style="color:#1F1D18;font-weight:600;text-align:right" x-text="row.value"></span>
+            </div>
+          </template>
+        </div>
+        <div style="background:#fff;border:1px solid #EBE6DB;border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.55;color:#57534A">
+          <div style="font-weight:700;color:#1F1D18;margin-bottom:6px">💡 Cómo afecta la inflación</div>
+          <span x-text="inflationNote()"></span> Por eso verás tu pensión en <strong>pesos nominales</strong> (del año de jubilación) y también podrás verla <strong style="color:#2C7A6B">ajustada a inflación</strong>, en pesos de hoy.
+        </div>
       </div>
 
       <!-- nav -->
@@ -153,29 +167,20 @@
       <div class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:clamp(54px,13vw,104px);line-height:0.92;letter-spacing:-0.02em;color:#2C7A6B"><span x-text="view.heroAmount"></span><span style="font-size:0.3em;font-weight:500;color:#8A857A;letter-spacing:0"> /mes</span></div>
       <div style="margin-top:10px"><span :style="view.statusStyle" x-text="view.statusWord"></span></div>
       <div style="margin-top:16px;display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #E6E1D6;border-radius:99px;padding:7px 16px;font-size:13px;color:#57534A">entre <strong class="simp-num" style="color:#1F1D18;font-weight:600" x-text="view.rangeLow"></strong> y <strong class="simp-num" style="color:#1F1D18;font-weight:600" x-text="view.rangeHigh"></strong></div>
-
-      <!-- nominal vs inflation-adjusted toggle -->
-      <div style="margin-top:22px;display:flex;justify-content:center">
-        <div style="display:inline-flex;align-items:center;background:#EAE4D7;border:1px solid #E3DDCE;border-radius:99px;padding:4px;box-shadow:inset 0 1px 2px rgba(31,29,24,0.05)">
-          <button @click="verReal=false" :style="segStyle(!verReal)">Pesos nominales</button>
-          <button @click="verReal=true" :style="segStyle(verReal)">Ajustado a inflación</button>
-        </div>
-      </div>
-      <div style="max-width:430px;margin:10px auto 0;font-size:12px;line-height:1.5;color:#A39E92" x-text="verReal ? 'En pesos de hoy — descontamos la inflación para mostrar el poder adquisitivo actual de tu pensión.' : 'En pesos del año de jubilación, sin descontar inflación. La cifra se ve más alta de lo que valdrá en la práctica.'"></div>
     </div>
 
-    <!-- goal gap (only when a target pension was set) -->
+    <!-- goal gap (secondary focus, only when a target pension was set) -->
     <template x-if="view.goal">
-      <div style="max-width:560px;margin:0 auto 22px;background:#fff;border:1px solid #EBE6DB;border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(31,29,24,0.04);text-align:center">
-        <div style="font-size:13px;color:#57534A">Tu objetivo: <strong class="simp-num" style="color:#1F1D18" x-text="view.goal.target"></strong> /mes · Proyectado: <strong class="simp-num" style="color:#1F1D18" x-text="view.goal.projectedReal"></strong> /mes</div>
-        <div style="font-size:11px;color:#A39E92;margin-top:3px">en pesos nominales al retiro</div>
+      <div style="max-width:520px;margin:0 auto 26px;background:#F4F9F7;border:1px solid #D6E7E1;border-radius:18px;padding:20px 22px;text-align:center">
+        <div style="font-size:13px;color:#57534A">Objetivo <strong class="simp-num" style="color:#1F1D18" x-text="view.goal.target"></strong>/mes · proyectado <strong class="simp-num" style="color:#1F1D18" x-text="view.goal.projectedReal"></strong>/mes <span style="color:#A39E92">(nominal)</span></div>
         <template x-if="!view.goal.met && view.goal.recommendedApv">
-          <div style="margin-top:12px;font-size:13.5px;color:#1F1D18;line-height:1.5">Aportando <strong class="simp-num" style="color:#2C7A6B" x-text="view.goal.recommendedApvText"></strong>/mes en APV (Régimen A) cierras la brecha.
-            <button @click="applyRecommendedApv()" style="display:inline-block;margin-top:6px;background:#2C7A6B;color:#fff;border:none;border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Aplicar</button>
+          <div style="margin-top:14px">
+            <div style="font-size:14.5px;color:#1F1D18;line-height:1.5;margin-bottom:14px">Aportando <strong class="simp-num" style="color:#2C7A6B" x-text="view.goal.recommendedApvText"></strong>/mes en APV (Régimen A) cierras la brecha.</div>
+            <button @click="applyRecommendedApv()" style="background:#2C7A6B;color:#fff;border:none;border-radius:11px;padding:12px 28px;font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px -4px rgba(44,122,107,0.5)">Aplicar a mi plan</button>
           </div>
         </template>
         <template x-if="view.goal.met">
-          <div style="margin-top:8px;font-size:13.5px;color:#4F9B62;font-weight:600">¡Tu proyección ya cubre tu objetivo! 🎉</div>
+          <div style="margin-top:10px;font-size:14.5px;color:#4F9B62;font-weight:600">¡Tu proyección ya cubre tu objetivo! 🎉</div>
         </template>
       </div>
     </template>
@@ -189,15 +194,18 @@
             <span class="simp-num" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12.5px" :style="chip.valueColor" x-text="chip.pension"></span>
           </button>
         </template>
-        <button @click="comparar = !comparar" :style="view.compararStyle">⇄ Comparar los 3</button>
+        <button @click="comparar = !comparar" class="comparar-btn" :style="view.compararStyle">⇄ Comparar los 3</button>
       </div>
     </div>
 
     <!-- chart card -->
     <div style="background:#fff;border:1px solid #EBE6DB;border-radius:18px;padding:22px 22px 16px;box-shadow:0 1px 2px rgba(31,29,24,0.04),0 12px 28px -18px rgba(31,29,24,0.18);margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="font-size:13px;font-weight:600;color:#57534A" x-text="view.chartTitle"></div>
-        <div style="font-size:12px;color:#A39E92" x-text="view.chartUnit"></div>
+        <div style="display:inline-flex;align-items:center;background:#F3EFE6;border:1px solid #E3DDCE;border-radius:99px;padding:3px" title="Nominal: pesos del año de jubilación (sin descontar inflación). Ajustado: en pesos de hoy, descontando la inflación para reflejar el poder adquisitivo real.">
+          <button @click="verReal=false" :style="segStyle(!verReal)">Nominal</button>
+          <button @click="verReal=true" :style="segStyle(verReal)">Ajustado a inflación</button>
+        </div>
       </div>
       <div style="position:relative;cursor:crosshair" x-data="{ hi: null }"
            @mousemove="hi = nearestCol($el, $event.clientX)"
