@@ -127,7 +127,7 @@
 
     return {
       series,
-      total: series.at(-1).total,
+      total: series[series.length - 1].total,
       // Pension is funded only by the pension savings (AFP + APV); the ETF is for
       // personal goals, not retirement, so it's excluded from the pension estimate.
       pensionBalance: afpBalance + apvBalance,
@@ -156,6 +156,49 @@
     return (finalBalance / months) * (1 - HEALTH_CONTRIBUTION);
   }
 
+  // Default legal retirement age and life-expectancy assumption by sex (Chile).
+  function defaultsForSex(sex) {
+    return sex === 'female'
+      ? { retirementAge: 60, lifeExpectancy: 90 }
+      : { retirementAge: 65, lifeExpectancy: 85 };
+  }
+
+  // Rough current AFP balance: assume contributions since `startAge`, 10% of the
+  // taxable salary, compounding at `afpReturn`, with the salary having grown at
+  // `salaryGrowth`. Reconstructs the salary at startAge by deflating the current one.
+  function estimateAfpBalance({ netSalary, taxableFactor, currentAge, afpReturn, salaryGrowth, startAge = 25 }) {
+    const years = currentAge - startAge;
+    if (years <= 0) return 0;
+    let net = netSalary / Math.pow(1 + salaryGrowth, years);
+    let balance = 0;
+    for (let i = 0; i < years; i++) {
+      const contribution = taxableFromNet(net, taxableFactor) * MANDATORY_CONTRIBUTION;
+      balance = growYear(balance, contribution, afpReturn);
+      net *= (1 + salaryGrowth);
+    }
+    return balance;
+  }
+
+  // Monthly Régimen A APV (nominal CLP) whose nominal pension meets `targetPension`.
+  // Pension is monotonic increasing in the contribution, so we binary-search.
+  // Returns 0 if the target is already met with no APV.
+  // ponytail: fixed 40-iter bisection, sub-peso precision over the search range.
+  function solveApvForTarget(inputs, targetPension) {
+    const pensionFor = (monthlyA) => {
+      const inp = { ...inputs, apvRegime: 'A', apvContributionA: monthlyA, apvContributionB: 0, apvStartAge: null };
+      const proj = project(inp, 0);
+      return estimatedPension(proj.pensionBalance, inp.retirementAge, inp.lifeExpectancy);
+    };
+    if (pensionFor(0) >= targetPension) return 0;
+    let lo = 0, hi = 5000000; // ponytail: $5M/mo search ceiling; returns ceiling if unreachable
+    if (pensionFor(hi) < targetPension) return hi;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (pensionFor(mid) < targetPension) lo = mid; else hi = mid;
+    }
+    return Math.round(hi);
+  }
+
   // Converts a nominal series to today's pesos by discounting inflation.
   function toReal(series, inflation, currentAge) {
     return series.map((p) => ({
@@ -168,5 +211,6 @@
     monthlyRate, growYear, taxableFromNet, monthlyAfpContribution,
     bonusA, marginalRate, taxSavingsB, project, scenarios,
     estimatedPension, toReal,
+    defaultsForSex, estimateAfpBalance, solveApvForTarget,
   };
 });

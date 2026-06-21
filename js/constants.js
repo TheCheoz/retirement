@@ -28,8 +28,10 @@
 
   const DEFAULTS = {
     currentAge: 30,
+    sex: null,
     retirementAge: 65,
     lifeExpectancy: 85,
+    targetPension: null,
     netSalary: 1000000,
     taxableFactor: 1.22,
     afpContributionManual: null,

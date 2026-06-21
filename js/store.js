@@ -69,6 +69,9 @@
       verReal: false,
       controlsOpen: typeof window !== 'undefined' && window.innerWidth >= 768,
       advOpen: false,
+      screen: 'summary',
+      wizardStep: 1,
+      wiz: { goalType: null, idealPension: null, lifestyleSpending: null, afpEstimated: 0, afpManual: null },
       toast: '',
       view: {},
       indicators: { updated: false, date: '' },
@@ -77,13 +80,15 @@
         const saved = readStateFromHash() || loadState();
         // version gates the saved-bundle shape; bump it when the model changes so
         // stale state is dropped instead of silently misread.
-        if (saved && saved.version === 3 && saved.base) {
+        if (saved && saved.version === 4 && saved.base) {
           this.base = saved.base;
           if (saved.apv) this.apv = saved.apv;
           if (saved.indicadores) this.indicadores = saved.indicadores;
           if (saved.active) this.active = saved.active;
           if (typeof saved.verReal === 'boolean') this.verReal = saved.verReal;
         }
+        // Fresh visitor (no valid saved state, no shared link) starts in the wizard.
+        this.screen = (saved && saved.version === 4) ? 'summary' : 'wizard';
         this.recompute();
         this.$watch('base', () => this.onChange(), { deep: true });
         this.$watch('apv', () => this.onChange(), { deep: true });
@@ -138,7 +143,7 @@
 
       bundle() {
         const { base, apv, indicadores, active, verReal } = this;
-        return { version: 3, base, apv, indicadores, active, verReal };
+        return { version: 4, base, apv, indicadores, active, verReal };
       },
 
       _debounce: null,
@@ -167,16 +172,90 @@
         } catch { this.flash('No se pudo compartir'); }
       },
 
-      reset() {
-        const d = defaults();
-        this.base = d.base;
-        this.apv = d.apv;
-        this.active = 'A';
-        this.comparar = false;
-        this.flash('Restablecido · UF/UTM conservadas');
+      // --- wizard ---
+      // Retirement age + life expectancy implied by the chosen sex (null until chosen).
+      sexDefaults() { return this.base.sex ? E.defaultsForSex(this.base.sex) : null; },
+
+      // One-line explanation of what the chosen goal does with the projection.
+      goalHint() {
+        return {
+          ideal: 'Compararemos tu pensión proyectada con este monto y te diremos cuánto APV falta para alcanzarlo.',
+          lifestyle: 'Calcularemos una pensión que cubra ese gasto mensual.',
+          estimate: 'Solo te mostramos tu pensión proyectada, sin una meta que alcanzar.',
+        }[this.wiz.goalType] || '';
+      },
+
+      nextStep() { this.wizardStep++; },
+      prevStep() { if (this.wizardStep > 1) this.wizardStep--; },
+
+      // Re-estimate the AFP balance from the current salary/age (call on salary input).
+      recalcAfpEstimate() {
+        this.wiz.afpEstimated = Math.round(E.estimateAfpBalance({
+          netSalary: this.base.netSalary,
+          taxableFactor: this.base.taxableFactor,
+          currentAge: this.base.currentAge,
+          afpReturn: this.base.afpReturn,
+          salaryGrowth: this.base.salaryGrowth,
+        }));
+      },
+
+      // Map wizard answers into the shared model, then show the summary.
+      applyWizard() {
+        const sexDefaults = E.defaultsForSex(this.base.sex);
+        this.base.retirementAge = sexDefaults.retirementAge;
+        this.base.lifeExpectancy = sexDefaults.lifeExpectancy;
+        // 'estimate' just wants to see the projection — no target pension set.
+        if (this.wiz.goalType === 'ideal') this.base.targetPension = +this.wiz.idealPension || null;
+        else if (this.wiz.goalType === 'lifestyle') this.base.targetPension = +this.wiz.lifestyleSpending || null;
+        else this.base.targetPension = null;
+        const afp = (this.wiz.afpManual != null && this.wiz.afpManual !== '')
+          ? +this.wiz.afpManual : this.wiz.afpEstimated;
+        this.base.afpBalance = Math.round(afp || 0);
+        this.screen = 'summary';
+        this.recompute();
+        saveState(this.bundle());
+      },
+
+      restartWizard() { this.wizardStep = 1; this.screen = 'wizard'; },
+
+      // Goal gap vs the active scenario, in nominal pesos (matches the hero default).
+      // null when no target set.
+      goalInfo() {
+        const t = this.base.targetPension;
+        if (!t) return null;
+        const scn = this._inputs(this.active);
+        const proj = E.project(scn, 0);
+        const projected = E.estimatedPension(proj.pensionBalance, scn.retirementAge, scn.lifeExpectancy);
+        const gap = t - projected;
+        // Tolerance so a rounding-hair gap (or the just-applied recommendation)
+        // counts as met, instead of re-recommending what's already in place.
+        const met = gap <= Math.max(1000, t * 0.005);
+        const recommendedApv = met ? 0 : E.solveApvForTarget(scn, t);
+        return {
+          target: fmt(t), projectedReal: fmt(projected),
+          met, recommendedApv, recommendedApvText: fmt(recommendedApv),
+        };
+      },
+
+      // "Aplicar": adopt the recommended APV (Régimen A) and switch to the APV scenario.
+      applyRecommendedApv() {
+        const info = this.goalInfo();
+        if (!info || !info.recommendedApv) return;
+        this.apv.regime = 'A';
+        this.apv.aporteA = info.recommendedApv;
+        this.apv.aporteB = 0;
+        this.active = 'B';
+        this.flash('APV recomendado aplicado');
       },
 
       fmt,
+
+      // Pill style for the nominal/inflation segmented toggle.
+      segStyle(active) {
+        return 'padding:9px 18px;border:none;border-radius:99px;cursor:pointer;font-family:Inter,sans-serif;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s;background:'
+          + (active ? '#2C7A6B' : 'transparent') + ';color:' + (active ? '#fff' : '#57534A')
+          + ';box-shadow:' + (active ? '0 2px 8px -2px rgba(44,122,107,0.5)' : 'none');
+      },
 
       // Engine input for a scenario key: shared base + UF/UTM, with the APV
       // strategy applied (or zeroed) per the scenario definition.
@@ -380,6 +459,7 @@
           stats, compareRows,
           activeName: this.scenarioName(this.active),
           activeHasApv: DEFS[this.active].apv,
+          goal: this.goalInfo(),
         };
       },
     };

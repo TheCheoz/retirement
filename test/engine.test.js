@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { monthlyRate, growYear, taxableFromNet, monthlyAfpContribution, bonusA, marginalRate, taxSavingsB, project, scenarios, estimatedPension, toReal } = require('../js/engine.js');
+const { monthlyRate, growYear, taxableFromNet, monthlyAfpContribution, bonusA, marginalRate, taxSavingsB, project, scenarios, estimatedPension, toReal, defaultsForSex, estimateAfpBalance, solveApvForTarget } = require('../js/engine.js');
+const { DEFAULTS } = require('../js/constants.js');
 
 test('monthlyRate: 12 compounded months reconstruct the annual rate', () => {
   const m = monthlyRate(0.06);
@@ -158,4 +159,41 @@ test('toReal: discounts inflation by years from today', () => {
   const r = toReal(series, 0.10, 30);
   assert.equal(Math.round(r[0].total), 1000000);          // year 0
   assert.equal(Math.round(r[1].total), Math.round(1000000 / 1.1)); // year 1
+});
+
+test('defaultsForSex returns Chilean legal defaults', () => {
+  assert.deepStrictEqual(defaultsForSex('female'), { retirementAge: 60, lifeExpectancy: 90 });
+  assert.deepStrictEqual(defaultsForSex('male'), { retirementAge: 65, lifeExpectancy: 85 });
+});
+
+test('estimateAfpBalance is 0 at or below startAge', () => {
+  const args = { netSalary: 1000000, taxableFactor: 1.22, currentAge: 25, afpReturn: 0.04, salaryGrowth: 0.02 };
+  assert.equal(estimateAfpBalance(args), 0);
+  assert.equal(estimateAfpBalance({ ...args, currentAge: 22 }), 0);
+});
+
+test('estimateAfpBalance grows with age and with salary', () => {
+  const base = { netSalary: 1000000, taxableFactor: 1.22, afpReturn: 0.04, salaryGrowth: 0.02 };
+  const at40 = estimateAfpBalance({ ...base, currentAge: 40 });
+  const at30 = estimateAfpBalance({ ...base, currentAge: 30 });
+  assert.ok(at40 > at30);
+  const richer = estimateAfpBalance({ ...base, currentAge: 40, netSalary: 2000000 });
+  assert.ok(richer > at40);
+});
+
+test('solveApvForTarget returns 0 when target already met', () => {
+  const inp = { ...DEFAULTS, utm: DEFAULTS.utm, uf: DEFAULTS.uf, apvRegime: 'none', apvContributionA: 0, apvContributionB: 0 };
+  assert.equal(solveApvForTarget(inp, 1), 0);
+});
+
+test('solveApvForTarget converges to a Régimen A contribution that meets the nominal target', () => {
+  const inp = { ...DEFAULTS, apvRegime: 'none', apvContributionA: 0, apvContributionB: 0, afpBalance: 0 };
+  const pension = (a) => {
+    const p = project({ ...inp, apvRegime: 'A', apvContributionA: a, apvContributionB: 0, apvStartAge: null }, 0);
+    return estimatedPension(p.pensionBalance, inp.retirementAge, inp.lifeExpectancy);
+  };
+  const target = pension(0) + 100000;
+  const z = solveApvForTarget(inp, target);
+  assert.ok(z > 0);
+  assert.ok(pension(z) >= target - 1000); // within ~$1k of the target
 });
